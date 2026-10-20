@@ -44,12 +44,23 @@ class NSE(
             q = nse.equity_quote("RELIANCE")
             chain = nse.compile_option_chain("NIFTY")
 
-    Natural language queries (requires Anthropic API key)::
+    Natural language queries (uses the local claude CLI — no API key needed
+    when running inside a Claude Code session)::
 
-        with NSE(anthropic_api_key="sk-ant-...") as nse:
+        with NSE(brain=True) as nse:
             print(nse.ask("What is the current NIFTY 50 level?"))
             print(nse.analyze("HDFC BANK"))
             print(nse.market_summary())
+
+    Self-healing mode (intercepts broken calls and auto-patches them)::
+
+        with NSE(guard=True) as nse:
+            nse.equity_quote("RELIANCE")   # heals itself if something breaks
+
+    Outside a Claude Code session (explicit API key)::
+
+        with NSE(anthropic_api_key="sk-ant-...") as nse:
+            print(nse.ask("..."))
     """
 
     def __init__(
@@ -59,6 +70,7 @@ class NSE(
         download_folder: str | Path = ".",
         rate:            float = 3.0,
         timeout:         int   = 15,
+        brain:           bool  = False,
         guard:           bool  = False,
     ):
         self._session  = NSESession(
@@ -69,14 +81,18 @@ class NSE(
         self._brain:    Brain    | None = None
         self._guardian: Guardian | None = None
 
-        if anthropic_api_key:
+        # Brain activates when: brain=True, guard=True, or api_key supplied
+        if brain or guard or anthropic_api_key:
             self._brain = Brain(api_key=anthropic_api_key, model=model)
             self._register_brain_tools()
 
-            if guard:
-                self._guardian = Guardian(self._session, self._brain)
-                # Redirect all session.get() calls through the Guardian
-                self._session.get = self._guardian.guarded_get
+        if guard:
+            if self._brain is None:
+                self._brain = Brain(api_key=anthropic_api_key, model=model)
+                self._register_brain_tools()
+            self._guardian = Guardian(self._session, self._brain)
+            # Redirect all session.get() calls through the Guardian
+            self._session.get = self._guardian.guarded_get
 
     # ------------------------------------------------------------------ #
     #  Context manager                                                     #

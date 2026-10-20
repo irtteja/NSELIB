@@ -21,21 +21,29 @@ from .core  import NSESession
 from .exceptions import NSEFileUnavailableError
 
 
-# Every path nselib already knows about
+# Every path nselib currently uses (kept up to date)
 _KNOWN_PATHS: set[str] = {
-    "quote-equity", "equity-meta-info", "search/autocomplete",
-    "NextApi/apiClient/getScripHeaderData",
-    "allIndices", "equity-stockIndices",
-    "historicalOR/indicesHistory", "historicalOR/chartData",
+    # quotes
+    "NextApi/apiClient/GetQuoteApi",
+    "top-corp-info",
+    # indices
+    "allIndices",
+    "historicalOR/indicesHistory",
+    # market
     "marketStatus", "holiday-master", "etf",
-    "live-analysis-emerge-market", "sovereign-gold-bond",
     "live-analysis-volume-gainers", "market-data-pre-open",
-    "block-deal", "bulk-deal-archives",
-    "historical/cm/equity", "historical/fo/derivatives",
-    "corporates-corporateActions", "corporates-announcements",
-    "corporates-board-meetings", "corporates-financial-results",
-    "corporates-shp", "annual-reports", "corporates-pit",
-    "option-chain-indices", "option-chain-equities", "quote-derivative",
+    "block-deal", "historicalOR/bulk-block-short-deals",
+    # history
+    "historicalOR/cm/equity", "historicalOR/fo/derivatives",
+    # corporate
+    "corporates-corporateActions",
+    "corporate-announcements",
+    "corporate-board-meetings",
+    "corporates-financial-results",
+    "annual-reports", "corporates-pit",
+    # fno
+    "NextApi/apiClient/GetQuoteApi",
+    # downloads / misc
     "daily-reports",
 }
 
@@ -84,6 +92,7 @@ class Guardian:
     def __init__(self, session: NSESession, brain: Brain):
         self._session     = session
         self._brain       = brain
+        self._raw_get     = session.get   # original get, captured before any monkey-patch
         self._lock        = threading.Lock()
         self._patches:    dict[str, dict]  = {}   # path → {headers, params, new_path}
         self._schema:     dict[str, set]   = {}   # path → last-seen top-level keys
@@ -126,7 +135,7 @@ class Guardian:
             sess.headers.update(patch["headers"])
 
         try:
-            return self._session.get(effective_path, merged_params or None)
+            return self._raw_get(effective_path, merged_params or None)
         finally:
             if patch.get("headers"):
                 sess.headers.clear()
