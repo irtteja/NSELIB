@@ -222,30 +222,60 @@ class Guardian:
 
     def discover(self) -> list[dict]:
         """
-        Fetch NSE's JS bundle, extract API paths, compare against
-        what nselib already knows, and ask Claude to generate methods
-        for anything new. Returns list of discovery dicts.
+        Ask Claude to suggest NSE API endpoints not yet in nselib, then
+        probe each candidate directly to confirm it's live.
+        Works on any IP — no JS bundle scraping needed.
+        Returns list of discovery dicts with confirmed live endpoints.
         """
-        print("[Guardian] Fetching NSE JS bundle…")
-        js = self._fetch_nse_js()
-        if not js:
-            print("[Guardian] Could not fetch NSE JS (likely blocked on this IP).")
-            return []
-
-        found   = self._extract_api_paths(js)
-        new     = found - _KNOWN_PATHS
-
-        if not new:
-            print("[Guardian] No new endpoints found.")
-            return []
-
-        print(f"[Guardian] {len(new)} new path(s) found: {sorted(new)}")
+        print("[Guardian] Asking Claude for undiscovered NSE endpoints…")
 
         prompt = (
-            f"These NSE API endpoint paths are new — not yet in our Python library:\n"
-            f"{json.dumps(sorted(new), indent=2)}\n\n"
-            f"For each one that looks like a real data endpoint (skip assets/fonts/images), "
-            f"generate a Python method. Reply with ONLY a valid JSON array:\n"
+            f"You are an expert on NSE India's undocumented REST API at "
+            f"https://www.nseindia.com/api/\n\n"
+            f"nselib already knows these paths:\n"
+            f"{json.dumps(sorted(_KNOWN_PATHS), indent=2)}\n\n"
+            f"List the TOP 20 most useful NSE API paths that nselib is likely MISSING. "
+            f"Be specific and high-confidence only — paths you are fairly certain exist "
+            f"(not guesses). Focus on: FII/DII data, put-call ratio, OI analysis, "
+            f"52-week data, circuit breakers, deliverable positions, VIX, "
+            f"currency/commodity derivatives that definitely exist.\n\n"
+            f"Reply ONLY with a JSON array of up to 20 candidate paths "
+            f"(relative, no /api/ prefix):\n"
+            f'["path1", "path2", ...]'
+        )
+
+        raw = self._brain.ask(prompt)
+        candidates = self._parse_json(raw)
+        if not isinstance(candidates, list):
+            print("[Guardian] No candidates returned.")
+            return []
+
+        candidates = [p for p in candidates if isinstance(p, str) and p not in _KNOWN_PATHS]
+        print(f"[Guardian] {len(candidates)} candidate(s) to probe: {candidates}")
+
+        # Probe each candidate directly — only keep ones that return real data
+        live: list[str] = []
+        for path in candidates:
+            try:
+                resp = self._raw_get(path, None)
+                if resp and not self._is_broken(resp):
+                    live.append(path)
+                    print(f"[Guardian]   ✓ live: {path}")
+            except Exception:
+                pass  # 404 or error — skip
+
+        if not live:
+            print("[Guardian] No live new endpoints confirmed.")
+            return []
+
+        print(f"[Guardian] Confirmed {len(live)} new endpoint(s). Generating methods…")
+
+        gen_prompt = (
+            f"These NSE API endpoints are confirmed live and not yet in nselib:\n"
+            f"{json.dumps(live, indent=2)}\n\n"
+            f"For each one, generate a Python mixin method. "
+            f"IMPORTANT: paths are relative — NSESession.get() adds the /api/ prefix automatically. "
+            f"Reply with ONLY a valid JSON array:\n"
             f"[\n"
             f"  {{\n"
             f'    "path": "the-endpoint-path",\n'
@@ -256,8 +286,8 @@ class Guardian:
             f"]"
         )
 
-        raw = self._brain.ask(prompt)
-        discoveries = self._parse_json(raw)
+        raw2 = self._brain.ask(gen_prompt)
+        discoveries = self._parse_json(raw2)
         if not isinstance(discoveries, list):
             discoveries = []
 
@@ -332,35 +362,6 @@ class Guardian:
     # ------------------------------------------------------------------ #
     #  Internals                                                           #
     # ------------------------------------------------------------------ #
-
-    def _fetch_nse_js(self) -> str:
-        try:
-            sess = self._session._s
-            home = sess.get("https://www.nseindia.com/", timeout=15)
-            # Pick first chunked JS file from Next.js build
-            matches = re.findall(
-                r'src=["\']?(/_next/static/chunks/[^"\'>\s]+\.js)["\']?',
-                home.text,
-            )
-            if not matches:
-                return ""
-            js_url  = "https://www.nseindia.com" + matches[0]
-            js_resp = sess.get(js_url, timeout=20)
-            return js_resp.text
-        except Exception as e:
-            print(f"[Guardian] JS fetch error: {e}")
-            return ""
-
-    def _extract_api_paths(self, js: str) -> set[str]:
-        """Pull candidate API path strings out of NSE's JS bundle."""
-        # Match quoted strings that look like kebab-case API paths
-        raw = re.findall(r'["\`]([a-zA-Z][a-zA-Z0-9/_-]{4,60})["\`]', js)
-        paths: set[str] = set()
-        for p in raw:
-            # Must look like an API path: contains a hyphen or slash, no dots/spaces
-            if ("/" in p or "-" in p) and "." not in p and " " not in p:
-                paths.add(p.lstrip("/"))
-        return paths
 
     @staticmethod
     def _parse_json(text: str) -> Any:
