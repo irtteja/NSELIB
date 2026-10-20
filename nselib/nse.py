@@ -71,6 +71,7 @@ class NSE(
         brain:           bool  = False,
         guard:           bool  = False,
         model:           str   = "claude-haiku-5-5",
+        patches_file:    str | Path | None = Path.home() / ".nselib" / "patches.json",
         anthropic_api_key: str | None = None,
     ):
         self._session  = NSESession(
@@ -90,7 +91,8 @@ class NSE(
             if self._brain is None:
                 self._brain = Brain(api_key=anthropic_api_key, model=model)
                 self._register_brain_tools()
-            self._guardian = Guardian(self._session, self._brain)
+            self._guardian = Guardian(self._session, self._brain,
+                                       patches_file=patches_file)
             # Redirect all session.get() calls through the Guardian
             self._session.get = self._guardian.guarded_get
 

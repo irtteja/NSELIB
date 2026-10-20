@@ -89,7 +89,8 @@ class Guardian:
         g.watch(interval=3600)      # run discover() in background every hour
     """
 
-    def __init__(self, session: NSESession, brain: Brain):
+    def __init__(self, session: NSESession, brain: Brain,
+                 patches_file: str | Path | None = None):
         self._session     = session
         self._brain       = brain
         self._raw_get     = session.get   # original get, captured before any monkey-patch
@@ -98,6 +99,40 @@ class Guardian:
         self._schema:     dict[str, set]   = {}   # path → last-seen top-level keys
         self._heal_log:   list[dict]       = []   # what was healed and when
         self._discoveries: list[dict]      = []   # new endpoints Claude found
+        self._patches_file: Path | None = Path(patches_file) if patches_file else None
+        self._load_patches()
+
+    # ------------------------------------------------------------------ #
+    #  Persistent patches                                                #
+    # ------------------------------------------------------------------ #
+
+    def _load_patches(self) -> None:
+        if not self._patches_file or not self._patches_file.exists():
+            return
+        try:
+            data = json.loads(self._patches_file.read_text())
+            self._patches = data.get("patches", {})
+            if data.get("cookie_ttl"):
+                self._session._COOKIE_TTL = data["cookie_ttl"]
+            loaded = len(self._patches)
+            if loaded:
+                print(f"[Guardian] Loaded {loaded} saved patch(es) from {self._patches_file}")
+        except Exception as e:
+            print(f"[Guardian] Could not load patches file: {e}")
+
+    def _save_patches(self) -> None:
+        if not self._patches_file:
+            return
+        try:
+            self._patches_file.parent.mkdir(parents=True, exist_ok=True)
+            data = {
+                "patches":    self._patches,
+                "cookie_ttl": self._session._COOKIE_TTL,
+                "saved_at":   datetime.now().isoformat(),
+            }
+            self._patches_file.write_text(json.dumps(data, indent=2))
+        except Exception as e:
+            print(f"[Guardian] Could not save patches file: {e}")
 
     # ------------------------------------------------------------------ #
     #  Heal                                                               #
@@ -194,6 +229,7 @@ class Guardian:
                 "explanation": fix.get("explanation", ""),
                 "patch":       patch,
             })
+            self._save_patches()
 
         print(f"[Guardian] Patch applied: {fix.get('explanation', 'unknown')}")
         return self._apply_and_get(path, params)
