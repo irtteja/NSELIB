@@ -1,0 +1,27 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# NSE session cookies and downloaded files
+nse_cookies.json
+*.csv
+*.zip
+*.gz
+*.DAT
+
+# env / IDE
+.env
+.venv/
+venv/
+.idea/
+.vscode/
+*.iml
+
+# pytest
+.pytest_cache/
+htmlcov/
+.coverage
