@@ -1,9 +1,55 @@
+import csv
+import io
 from datetime import date, timedelta
 from typing import Any
 
 
 def _fmt(d: date) -> str:
     return d.strftime("%d-%b-%Y")
+
+
+# NSE archive: index name → constituent CSV filename
+_CONSTITUENT_CSV: dict[str, str] = {
+    "NIFTY 50":                         "ind_nifty50list.csv",
+    "NIFTY NEXT 50":                    "ind_niftynext50list.csv",
+    "NIFTY 100":                        "ind_nifty100list.csv",
+    "NIFTY 200":                        "ind_nifty200list.csv",
+    "NIFTY 500":                        "ind_nifty500list.csv",
+    "NIFTY MIDCAP 50":                  "ind_niftymidcap50list.csv",
+    "NIFTY MIDCAP 100":                 "ind_niftymidcap100list.csv",
+    "NIFTY MIDCAP 150":                 "ind_niftymidcap150list.csv",
+    "NIFTY MIDCAP SELECT":              "ind_niftymidcapselect_list.csv",
+    "NIFTY SMALLCAP 50":                "ind_niftysmallcap50list.csv",
+    "NIFTY SMALLCAP 100":               "ind_niftysmallcap100list.csv",
+    "NIFTY SMALLCAP 250":               "ind_niftysmallcap250list.csv",
+    "NIFTY LARGEMIDCAP 250":            "ind_niftylargemidcap250list.csv",
+    "NIFTY MIDSMALLCAP 400":            "ind_niftymidsmallcap400list.csv",
+    "NIFTY MICROCAP 250":               "ind_niftymicrocap250_list.csv",
+    "NIFTY TOTAL MARKET":               "ind_niftytotalmarket_list.csv",
+    "NIFTY BANK":                       "ind_niftybanklist.csv",
+    "NIFTY IT":                         "ind_niftyitlist.csv",
+    "NIFTY AUTO":                       "ind_niftyautolist.csv",
+    "NIFTY PHARMA":                     "ind_niftypharmalist.csv",
+    "NIFTY FMCG":                       "ind_niftyfmcglist.csv",
+    "NIFTY METAL":                      "ind_niftymetallist.csv",
+    "NIFTY REALTY":                     "ind_niftyrealtylist.csv",
+    "NIFTY HEALTHCARE INDEX":           "ind_niftyhealthcarelist.csv",
+    "NIFTY INFRASTRUCTURE":             "ind_niftyinfralist.csv",
+    "NIFTY ENERGY":                     "ind_niftyenergylist.csv",
+    "NIFTY MEDIA":                      "ind_niftymedialist.csv",
+    "NIFTY PSU BANK":                   "ind_niftypsubanklist.csv",
+    "NIFTY CPSE":                       "ind_niftycpselist.csv",
+    "NIFTY PSE":                        "ind_niftypselist.csv",
+    "NIFTY OIL & GAS":                  "ind_niftyoilgaslist.csv",
+    "NIFTY MNC":                        "ind_niftymnclist.csv",
+    "NIFTY COMMODITIES":                "ind_niftycommoditieslist.csv",
+    "NIFTY INDIA CONSUMPTION":          "ind_niftyconsumptionlist.csv",
+    "NIFTY CONSUMER DURABLES":          "ind_niftyconsumerdurableslist.csv",
+    "NIFTY INDIA MANUFACTURING":        "ind_niftyindiamanufacturing_list.csv",
+    "NIFTY INDIA DEFENCE":              "ind_niftyindiadefence_list.csv",
+}
+
+NSE_ARCHIVE = "https://nsearchives.nseindia.com"
 
 
 class MarketMixin:
@@ -33,15 +79,38 @@ class MarketMixin:
     #  Stock universe                                                      #
     # ------------------------------------------------------------------ #
 
-    def list_equity_stocks_by_index(self, index: str = "NIFTY 50") -> dict:
+    def fetch_index_constituents(self, index: str = "NIFTY 50") -> list[dict]:
         """
-        All stocks in a given index with live price and change data.
-        Pass the result to gainers() / losers() / advance_decline().
+        Constituent stocks of an NSE index — company name, symbol, industry, ISIN.
+        Fetched from NSE's static archive (works from any IP).
+        Returns a list of dicts with keys: Company Name, Industry, Symbol, Series, ISIN Code.
         """
-        return self._session.get(
-            "equity-stockIndices",
-            params={"index": index},
-        )
+        key = index.upper()
+        filename = _CONSTITUENT_CSV.get(key)
+        if not filename:
+            # fuzzy match
+            match = next(
+                (k for k in _CONSTITUENT_CSV if key in k or k in key), None
+            )
+            if not match:
+                from ..exceptions import NSEDataError
+                raise NSEDataError(
+                    f"No constituent data for {index!r}. "
+                    f"Supported: {sorted(_CONSTITUENT_CSV.keys())}"
+                )
+            filename = _CONSTITUENT_CSV[match]
+
+        url  = f"{NSE_ARCHIVE}/content/indices/{filename}"
+        resp = self._session.get_raw(url)
+        reader = csv.DictReader(io.StringIO(resp.text))
+        return [dict(row) for row in reader]
+
+    def list_equity_stocks_by_index(self, index: str = "NIFTY 50") -> list[dict]:
+        """
+        Constituent stocks of an NSE index.
+        Returns the same data as fetch_index_constituents().
+        """
+        return self.fetch_index_constituents(index)
 
     def list_etf(self) -> dict:
         """All ETFs listed on NSE."""
