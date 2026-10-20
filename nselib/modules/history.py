@@ -1,4 +1,12 @@
+import csv as _csv
+import io as _io
+import zipfile as _zipfile
 from datetime import date, timedelta
+from pathlib import Path
+
+from ..exceptions import NSEFileUnavailableError
+
+NSE_ARCHIVE = "https://nsearchives.nseindia.com"
 
 
 def _fmt(d: date) -> str:
@@ -13,8 +21,93 @@ def _chunk(from_date: date, to_date: date, days: int = 100):
         cur = end + timedelta(days=1)
 
 
+def _calendar_days(from_date: date, to_date: date):
+    cur = from_date
+    while cur <= to_date:
+        yield cur
+        cur += timedelta(days=1)
+
+
 class HistoryMixin:
     """Historical OHLCV data for equities, F&O, and VIX."""
+
+    # ------------------------------------------------------------------ #
+    #  Bhavcopy helpers                                                    #
+    # ------------------------------------------------------------------ #
+
+    def _bhavcopy_cache_path(self, d: date) -> Path:
+        return (
+            self._session.download_folder
+            / "bhavcopy"
+            / d.strftime("%Y-%m")
+            / f"{d.strftime('%Y%m%d')}.csv"
+        )
+
+    def _fetch_bhavcopy_day(self, d: date) -> list[dict]:
+        """Return all rows from the CM bhavcopy for one trading day.
+        Returns [] for weekends / holidays (file not available)."""
+        cache = self._bhavcopy_cache_path(d)
+        if cache.exists():
+            with open(cache, newline="") as f:
+                return list(_csv.DictReader(f))
+
+        url = (
+            f"{NSE_ARCHIVE}/content/cm/"
+            f"BhavCopy_NSE_CM_0_0_0_{d.strftime('%Y%m%d')}_F_0000.csv.zip"
+        )
+        try:
+            resp = self._session.get_raw(url)
+        except NSEFileUnavailableError:
+            return []
+
+        zf = _zipfile.ZipFile(_io.BytesIO(resp.content))
+        csv_bytes = zf.read(zf.namelist()[0])
+        csv_text = csv_bytes.decode("utf-8")
+
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        cache.write_text(csv_text)
+
+        return list(_csv.DictReader(_io.StringIO(csv_text)))
+
+    def _equity_from_bhavcopy(
+        self,
+        symbol:    str,
+        series:    str,
+        from_date: date,
+        to_date:   date,
+    ) -> list[dict]:
+        sym = symbol.upper()
+        ser = series.upper()
+        rows: list[dict] = []
+
+        for d in _calendar_days(from_date, to_date):
+            if d.weekday() >= 5:
+                continue
+            daily = self._fetch_bhavcopy_day(d)
+            for row in daily:
+                if row.get("TckrSymb", "").strip() == sym and \
+                   row.get("SctySrs", "").strip() == ser:
+                    rows.append({
+                        "date":       row.get("TradDt", ""),
+                        "symbol":     row.get("TckrSymb", ""),
+                        "series":     row.get("SctySrs", ""),
+                        "open":       float(row["OpnPric"])  if row.get("OpnPric")  else None,
+                        "high":       float(row["HghPric"])  if row.get("HghPric")  else None,
+                        "low":        float(row["LwPric"])   if row.get("LwPric")   else None,
+                        "close":      float(row["ClsPric"])  if row.get("ClsPric")  else None,
+                        "last":       float(row["LastPric"]) if row.get("LastPric") else None,
+                        "prev_close": float(row["PrvsClsgPric"]) if row.get("PrvsClsgPric") else None,
+                        "volume":     int(float(row["TtlTradgVol"])) if row.get("TtlTradgVol") else None,
+                        "turnover":   float(row["TtlTrfVal"]) if row.get("TtlTrfVal") else None,
+                        "trades":     int(float(row["TtlNbOfTxsExctd"])) if row.get("TtlNbOfTxsExctd") else None,
+                    })
+                    break
+
+        return sorted(rows, key=lambda r: r["date"])
+
+    # ------------------------------------------------------------------ #
+    #  Public API                                                          #
+    # ------------------------------------------------------------------ #
 
     def fetch_equity_historical_data(
         self,
@@ -25,8 +118,9 @@ class HistoryMixin:
         days:      int | None = None,
     ) -> list[dict]:
         """
-        Daily OHLCV for an equity via NSE's Next API.
-        Ranges >100 days are auto-chunked. Returns oldest-first.
+        Daily OHLCV for an NSE equity.
+        Tries the NSE API first (fast, works on residential IPs).
+        Falls back to NSE bhavcopy archive (works from any IP including cloud).
 
         Args:
             symbol:    NSE symbol e.g. 'RELIANCE'
@@ -43,23 +137,31 @@ class HistoryMixin:
         if from_date > to_date:
             raise ValueError("from_date must be before to_date")
 
-        rows: list[dict] = []
-        for start, end in _chunk(from_date, to_date, days=100):
-            resp = self._session.get(
-                "historical/cm/equity",
-                params={
-                    "symbol":    symbol.upper(),
-                    "series":    f'["{series.upper()}"]',
-                    "from":      _fmt(start),
-                    "to":        _fmt(end),
-                    "csv":       "false",
-                },
-            )
-            chunk = resp.get("data", []) if isinstance(resp, dict) else []
-            rows.extend(chunk)
+        # Try the NSE Next API (fast, single request per 100-day chunk)
+        try:
+            rows: list[dict] = []
+            for start, end in _chunk(from_date, to_date, days=100):
+                resp = self._session.get(
+                    "historical/cm/equity",
+                    params={
+                        "symbol":  symbol.upper(),
+                        "series":  f'["{series.upper()}"]',
+                        "from":    _fmt(start),
+                        "to":      _fmt(end),
+                        "csv":     "false",
+                    },
+                )
+                chunk = resp.get("data", []) if isinstance(resp, dict) else []
+                rows.extend(chunk)
 
-        rows.sort(key=lambda r: r.get("mTIMESTAMP", r.get("CH_TIMESTAMP", "")))
-        return rows
+            if rows:
+                rows.sort(key=lambda r: r.get("mTIMESTAMP", r.get("CH_TIMESTAMP", "")))
+                return rows
+        except Exception:
+            pass
+
+        # Fall back to daily bhavcopy files from the NSE archive
+        return self._equity_from_bhavcopy(symbol, series, from_date, to_date)
 
     def fetch_historical_fno_data(
         self,

@@ -155,20 +155,26 @@ class MarketMixin:
     def advance_decline(self, index: str = "NIFTY 50") -> dict:
         """
         Advance / decline / unchanged count for a given index.
-        Computed from live stock data.
+        Fetched from live allIndices data.
         """
-        data   = self.list_equity_stocks_by_index(index)
-        stocks = data.get("data", [])
-        adv = sum(1 for s in stocks if s.get("pChange", 0) > 0)
-        dec = sum(1 for s in stocks if s.get("pChange", 0) < 0)
-        unc = sum(1 for s in stocks if s.get("pChange", 0) == 0)
+        all_data = self._session.get("allIndices")
+        indices  = all_data.get("data", []) if isinstance(all_data, dict) else []
+        idx = next(
+            (i for i in indices if i.get("index", "").upper() == index.upper()),
+            None,
+        )
+        if not idx:
+            return {"index": index, "advances": None, "declines": None, "unchanged": None, "total": None, "ratio": None}
+        adv = int(idx.get("advances", 0) or 0)
+        dec = int(idx.get("declines", 0) or 0)
+        unc = int(idx.get("unchanged", 0) or 0)
         return {
-            "index":    index,
-            "advances": adv,
-            "declines": dec,
+            "index":     index,
+            "advances":  adv,
+            "declines":  dec,
             "unchanged": unc,
-            "total":    len(stocks),
-            "ratio":    round(adv / dec, 2) if dec else None,
+            "total":     adv + dec + unc,
+            "ratio":     round(adv / dec, 2) if dec else None,
         }
 
     def live_volume_gainers(self) -> dict:
