@@ -25,10 +25,10 @@ class CorporateMixin:
         to_date   = to_date   or date.today()
         from_date = from_date or (to_date - timedelta(days=30))
         params: dict = {
-            "segment":  segment,
-            "series":   series.upper(),
-            "from":     _fmt(from_date),
-            "to":       _fmt(to_date),
+            "index":  segment,
+            "series": series.upper(),
+            "from":   _fmt(from_date),
+            "to":     _fmt(to_date),
         }
         if symbol:
             params["symbol"] = symbol.upper()
@@ -126,7 +126,7 @@ class CorporateMixin:
         """List of annual report PDFs for a company."""
         resp = self._session.get(
             "annual-reports",
-            params={"symbol": symbol.upper(), "isEquity": "true"},
+            params={"symbol": symbol.upper(), "index": "cm"},
         )
         return resp if isinstance(resp, list) else resp.get("data", resp)
 
