@@ -55,7 +55,7 @@ class CorporateMixin:
         }
         if symbol:
             params["symbol"] = symbol.upper()
-        resp = self._session.get("corporates-announcements", params=params)
+        resp = self._session.get("corporate-announcements", params=params)
         return resp if isinstance(resp, list) else resp.get("data", resp)
 
     def board_meetings(
@@ -74,7 +74,7 @@ class CorporateMixin:
         }
         if symbol:
             params["symbol"] = symbol.upper()
-        resp = self._session.get("corporates-board-meetings", params=params)
+        resp = self._session.get("corporate-board-meetings", params=params)
         return resp if isinstance(resp, list) else resp.get("data", resp)
 
     def financial_results(
@@ -133,9 +133,14 @@ class CorporateMixin:
         from_date: date | None = None,
         to_date:   date | None = None,
     ) -> list[dict]:
-        """SEBI insider trading disclosures (SAST)."""
+        """
+        SEBI insider trading disclosures (SAST / PIT).
+        Pass a symbol for best results — NSE returns empty without one
+        unless there happen to be bulk market-wide disclosures in the window.
+        Default window is 90 days.
+        """
         to_date   = to_date   or date.today()
-        from_date = from_date or (to_date - timedelta(days=30))
+        from_date = from_date or (to_date - timedelta(days=90))
         params: dict = {
             "from": _fmt(from_date),
             "to":   _fmt(to_date),
