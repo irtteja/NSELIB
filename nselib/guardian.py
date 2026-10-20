@@ -16,6 +16,18 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+_CATALOGUE_FILE = Path(__file__).parent / "endpoints.json"
+
+
+def _load_catalogue() -> dict:
+    """Return the endpoint catalogue, or empty dict if unavailable."""
+    try:
+        if _CATALOGUE_FILE.exists():
+            return json.loads(_CATALOGUE_FILE.read_text()).get("endpoints", {})
+    except Exception:
+        pass
+    return {}
+
 from .brain import Brain
 from .core  import NSESession
 from .exceptions import NSEFileUnavailableError
@@ -191,15 +203,29 @@ class Guardian:
     def _heal(self, path: str, params: dict | None, bad_resp: Any) -> Any:
         print(f"[Guardian] '{path}' returned empty/error — asking Claude to diagnose…")
 
+        # Build a compact catalogue summary for Brain to reason over
+        catalogue = _load_catalogue()
+        catalogue_lines = "\n".join(
+            f"  {p}: {meta.get('purpose', '')} | method={meta.get('nselib_method')} | params={meta.get('params', [])}"
+            for p, meta in catalogue.items()
+        )
+        catalogue_section = (
+            f"\nKnown NSE endpoints (from live catalogue):\n{catalogue_lines}\n"
+            if catalogue_lines else ""
+        )
+
         prompt = (
             f"An NSE India API call returned an empty or error response.\n"
             f"  path:     {path}\n"
             f"  params:   {json.dumps(params or {})}\n"
-            f"  response: {bad_resp!r}\n\n"
+            f"  response: {bad_resp!r}\n"
+            f"{catalogue_section}\n"
             f"IMPORTANT: Paths are relative — do NOT include '/api/' prefix. "
             f"NSESession.get() prepends 'https://www.nseindia.com/api/' automatically.\n"
-            f"If the path looks like a renamed endpoint (e.g. 'corporates-x' vs 'corporate-x', "
-            f"'historical' vs 'historicalOR'), suggest the corrected path.\n\n"
+            f"Use the catalogue above to find the correct or alternative path. "
+            f"If the failed path looks like a renamed version of a known endpoint "
+            f"(e.g. 'corporates-x' vs 'corporate-x', 'historical' vs 'historicalOR'), "
+            f"suggest the corrected path.\n\n"
             f"Reply with ONLY valid JSON:\n"
             f"{{\n"
             f'  "new_path": null_or_string,\n'
