@@ -65,13 +65,13 @@ class NSE(
 
     def __init__(
         self,
-        anthropic_api_key: str | None = None,
-        model:           str   = "claude-haiku-5-5",
         download_folder: str | Path = ".",
         rate:            float = 3.0,
         timeout:         int   = 15,
         brain:           bool  = False,
         guard:           bool  = False,
+        model:           str   = "claude-haiku-5-5",
+        anthropic_api_key: str | None = None,
     ):
         self._session  = NSESession(
             download_folder=download_folder,

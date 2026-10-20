@@ -154,12 +154,15 @@ class Guardian:
         print(f"[Guardian] '{path}' returned empty/error — asking Claude to diagnose…")
 
         prompt = (
-            f"An NSE API call returned an empty or error response.\n"
+            f"An NSE India API call returned an empty or error response.\n"
             f"  path:     {path}\n"
             f"  params:   {json.dumps(params or {})}\n"
-            f"  response: {bad_resp!r}\n"
-            f"  headers sent: {json.dumps(dict(self._session._s.headers))}\n\n"
-            f"Diagnose and suggest a fix. Reply with ONLY valid JSON:\n"
+            f"  response: {bad_resp!r}\n\n"
+            f"IMPORTANT: Paths are relative — do NOT include '/api/' prefix. "
+            f"NSESession.get() prepends 'https://www.nseindia.com/api/' automatically.\n"
+            f"If the path looks like a renamed endpoint (e.g. 'corporates-x' vs 'corporate-x', "
+            f"'historical' vs 'historicalOR'), suggest the corrected path.\n\n"
+            f"Reply with ONLY valid JSON:\n"
             f"{{\n"
             f'  "new_path": null_or_string,\n'
             f'  "extra_headers": {{}},\n'
