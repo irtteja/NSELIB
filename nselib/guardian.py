@@ -40,7 +40,7 @@ _KNOWN_PATHS: set[str] = {
     "corporate-announcements",
     "corporate-board-meetings",
     "corporates-financial-results",
-    "annual-reports", "corporates-pit",
+    "annual-reports", "corporates-pit", "event-calendar",
     # fno
     "NextApi/apiClient/GetQuoteApi",
     # downloads / misc
