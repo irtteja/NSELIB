@@ -110,17 +110,14 @@ class CorporateMixin:
         """
         Quarterly shareholding pattern (promoter / FII / DII / public).
         """
-        to_date   = to_date   or date.today()
-        from_date = from_date or (to_date - timedelta(days=365))
         resp = self._session.get(
-            "corporates-shp",
-            params={
-                "symbol": symbol.upper(),
-                "from":   _fmt(from_date),
-                "to":     _fmt(to_date),
-            },
+            "top-corp-info",
+            params={"symbol": symbol.upper(), "market": "equities"},
         )
-        return resp if isinstance(resp, list) else resp.get("data", resp)
+        shp = resp.get("shareholdings_patterns", {}) if isinstance(resp, dict) else {}
+        if isinstance(shp, dict):
+            shp = shp.get("data", shp.get("shareholding", []))
+        return shp if isinstance(shp, list) else []
 
     def annual_reports(self, symbol: str) -> list[dict]:
         """List of annual report PDFs for a company."""

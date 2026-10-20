@@ -8,6 +8,10 @@ def _fmt(d: date) -> str:
     return d.strftime("%d-%b-%Y")
 
 
+def _fmt_numeric(d: date) -> str:
+    return d.strftime("%d-%m-%Y")
+
+
 # NSE archive: index name → constituent CSV filename
 _CONSTITUENT_CSV: dict[str, str] = {
     "NIFTY 50":                         "ind_nifty50list.csv",
@@ -223,11 +227,11 @@ class MarketMixin:
             raise ValueError("from_date must be before to_date")
 
         resp = self._session.get(
-            "bulk-deal-archives",
+            "historicalOR/bulk-block-short-deals",
             params={
-                "startDate":  _fmt(from_date),
-                "endDate":    _fmt(to_date),
-                "category":   option_type,
+                "optionType": option_type,
+                "from":       _fmt_numeric(from_date),
+                "to":         _fmt_numeric(to_date),
             },
         )
         return resp.get("data", resp) if isinstance(resp, dict) else resp

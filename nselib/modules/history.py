@@ -137,12 +137,12 @@ class HistoryMixin:
         if from_date > to_date:
             raise ValueError("from_date must be before to_date")
 
-        # Try the NSE Next API (fast, single request per 100-day chunk)
+        # Try the NSE API (historicalOR path — fast, single request per 100-day chunk)
         try:
             rows: list[dict] = []
             for start, end in _chunk(from_date, to_date, days=100):
                 resp = self._session.get(
-                    "historical/cm/equity",
+                    "historicalOR/cm/equity",
                     params={
                         "symbol":  symbol.upper(),
                         "series":  f'["{series.upper()}"]',
@@ -155,12 +155,12 @@ class HistoryMixin:
                 rows.extend(chunk)
 
             if rows:
-                rows.sort(key=lambda r: r.get("mTIMESTAMP", r.get("CH_TIMESTAMP", "")))
+                rows.sort(key=lambda r: r.get("CH_TIMESTAMP", r.get("mTIMESTAMP", "")))
                 return rows
         except Exception:
             pass
 
-        # Fall back to daily bhavcopy files from the NSE archive
+        # Fall back to daily bhavcopy files from the NSE archive (works from any IP)
         return self._equity_from_bhavcopy(symbol, series, from_date, to_date)
 
     def fetch_historical_fno_data(
@@ -204,7 +204,7 @@ class HistoryMixin:
             if strike_price is not None:
                 params["strikePrice"] = str(strike_price)
 
-            resp = self._session.get("historical/fo/derivatives", params=params)
+            resp = self._session.get("historicalOR/fo/derivatives", params=params)
             chunk = resp.get("data", []) if isinstance(resp, dict) else []
             rows.extend(chunk)
 

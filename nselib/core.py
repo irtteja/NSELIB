@@ -158,16 +158,20 @@ class NSESession:
     def _refresh_cookies(self) -> None:
         """Visit NSE homepage to get a fresh Akamai session cookie."""
         try:
-            # Use a PreparedRequest so we can set EXACT headers (no merging with
-            # session-level headers that include AJAX-only fields like X-Requested-With).
             req = requests.Request("GET", NSE_BASE, headers=_HOME_HEADERS)
             prepared = self._s.prepare_request(req)
-            # Override final headers to match a clean browser navigation exactly
             prepared.headers = requests.structures.CaseInsensitiveDict(_HOME_HEADERS)
             resp = self._s.send(prepared, timeout=self._timeout)
-            self._s.cookies.update(resp.cookies)
-            self._cookie_ts = time.monotonic()
-            self._save_cookies()
+            if resp.status_code == 200:
+                # Only update cookies on success — a 403 from Akamai
+                # (cloud IP block) must not wipe out existing valid cookies.
+                self._s.cookies.update(resp.cookies)
+                self._cookie_ts = time.monotonic()
+                self._save_cookies()
+            else:
+                # Homepage blocked (cloud IP). Keep existing cookies alive by
+                # bumping the timestamp so we don't retry every single call.
+                self._cookie_ts = time.monotonic()
         except requests.RequestException as e:
             raise NSESessionError(
                 f"Could not reach NSE homepage: {e}\n"

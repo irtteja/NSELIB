@@ -18,6 +18,7 @@ from typing import Any
 
 from .brain import Brain
 from .core  import NSESession
+from .exceptions import NSEFileUnavailableError
 
 
 # Every path nselib already knows about
@@ -98,7 +99,13 @@ class Guardian:
         Drop-in replacement for NSESession.get().
         Automatically heals broken responses via Claude.
         """
-        resp = self._apply_and_get(path, params)
+        try:
+            resp = self._apply_and_get(path, params)
+        except NSEFileUnavailableError as e:
+            resp = self._heal(path, params, {"error": "404", "url": str(e)})
+            if isinstance(resp, dict):
+                self._check_schema(path, resp)
+            return resp
 
         if self._is_broken(resp):
             resp = self._heal(path, params, resp)
