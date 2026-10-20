@@ -37,7 +37,7 @@ _HEADERS = {
     ),
     "Accept":          "*/*",
     "Accept-Language": "en-US,en;q=0.9",
-    "Accept-Encoding": "gzip, deflate, br",
+    "Accept-Encoding": "gzip, deflate",
     "Connection":      "keep-alive",
     "Referer":         "https://www.nseindia.com/",
     "Origin":          "https://www.nseindia.com",
@@ -48,10 +48,16 @@ _HEADERS = {
 }
 
 _HOME_HEADERS = {
-    **_HEADERS,
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Sec-Fetch-Dest": "document",
-    "Sec-Fetch-Mode": "navigate",
+    "User-Agent": _HEADERS["User-Agent"],
+    "Accept":          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Accept-Encoding": "gzip, deflate",
+    "Connection":      "keep-alive",
+    "Sec-Fetch-Dest":  "document",
+    "Sec-Fetch-Mode":  "navigate",
+    "Sec-Fetch-Site":  "none",
+    "Sec-Fetch-User":  "?1",
+    "Upgrade-Insecure-Requests": "1",
 }
 
 
@@ -152,19 +158,20 @@ class NSESession:
     def _refresh_cookies(self) -> None:
         """Visit NSE homepage to get a fresh Akamai session cookie."""
         try:
-            resp = self._s.get(
-                NSE_BASE,
-                headers = _HOME_HEADERS,
-                timeout = self._timeout,
-            )
-            resp.raise_for_status()
+            # Use a PreparedRequest so we can set EXACT headers (no merging with
+            # session-level headers that include AJAX-only fields like X-Requested-With).
+            req = requests.Request("GET", NSE_BASE, headers=_HOME_HEADERS)
+            prepared = self._s.prepare_request(req)
+            # Override final headers to match a clean browser navigation exactly
+            prepared.headers = requests.structures.CaseInsensitiveDict(_HOME_HEADERS)
+            resp = self._s.send(prepared, timeout=self._timeout)
+            self._s.cookies.update(resp.cookies)
             self._cookie_ts = time.monotonic()
             self._save_cookies()
         except requests.RequestException as e:
             raise NSESessionError(
-                f"Could not obtain NSE session cookie: {e}\n"
-                "If running on a cloud/datacenter IP, NSE's Akamai may be blocking you. "
-                "Try running from a residential IP or use a broker API as the data source."
+                f"Could not reach NSE homepage: {e}\n"
+                "Check your network connection."
             ) from e
 
     def _ensure_session(self) -> None:
