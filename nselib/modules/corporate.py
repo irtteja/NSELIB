@@ -149,3 +149,15 @@ class CorporateMixin:
             params["symbol"] = symbol.upper()
         resp = self._session.get("corporates-pit", params=params)
         return resp if isinstance(resp, list) else resp.get("data", resp)
+
+    def event_calendar(self) -> list[dict]:
+        """
+        Comprehensive upcoming corporate event calendar from NSE.
+        Returns all companies with scheduled board meetings, results announcements,
+        dividends, AGMs, etc. across the current results season (~19 dates, ~490 entries).
+        Each record has: symbol, companyName, purpose, bm_date (dd-MMM-YYYY).
+        Unlike board_meetings(), this endpoint returns the full forward-looking calendar
+        rather than only the 20 most-recently-filed meeting notices.
+        """
+        resp = self._session.get("event-calendar")
+        return resp if isinstance(resp, list) else resp.get("data", resp)
