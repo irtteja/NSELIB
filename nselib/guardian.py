@@ -95,9 +95,10 @@ class Guardian:
         self._brain       = brain
         self._raw_get     = session.get   # original get, captured before any monkey-patch
         self._lock        = threading.Lock()
-        self._patches:    dict[str, dict]  = {}   # path → {headers, params, new_path}
-        self._schema:     dict[str, set]   = {}   # path → last-seen top-level keys
-        self._heal_log:   list[dict]       = []   # what was healed and when
+        self._patches:       dict[str, dict]        = {}   # path → {headers, params, new_path}
+        self._schema_remaps: dict[str, dict[str,str]] = {}   # path → {api_key: nselib_key}
+        self._schema:        dict[str, set]           = {}   # path → last-seen top-level keys
+        self._heal_log:      list[dict]               = []   # what was healed and when
         self._discoveries: list[dict]      = []   # new endpoints Claude found
         self._patches_file: Path | None = Path(patches_file) if patches_file else None
         self._load_patches()
@@ -111,7 +112,8 @@ class Guardian:
             return
         try:
             data = json.loads(self._patches_file.read_text())
-            self._patches = data.get("patches", {})
+            self._patches       = data.get("patches", {})
+            self._schema_remaps = data.get("schema_remaps", {})
             if data.get("cookie_ttl"):
                 self._session._COOKIE_TTL = data["cookie_ttl"]
             loaded = len(self._patches)
@@ -126,9 +128,10 @@ class Guardian:
         try:
             self._patches_file.parent.mkdir(parents=True, exist_ok=True)
             data = {
-                "patches":    self._patches,
-                "cookie_ttl": self._session._COOKIE_TTL,
-                "saved_at":   datetime.now().isoformat(),
+                "patches":       self._patches,
+                "schema_remaps": self._schema_remaps,
+                "cookie_ttl":    self._session._COOKIE_TTL,
+                "saved_at":      datetime.now().isoformat(),
             }
             self._patches_file.write_text(json.dumps(data, indent=2))
         except Exception as e:
@@ -148,14 +151,14 @@ class Guardian:
         except NSEFileUnavailableError as e:
             resp = self._heal(path, params, {"error": "404", "url": str(e)})
             if isinstance(resp, dict):
-                self._check_schema(path, resp)
+                resp = self._check_and_heal_schema(path, resp)
             return resp
 
         if self._is_broken(resp):
             resp = self._heal(path, params, resp)
 
         if isinstance(resp, dict):
-            self._check_schema(path, resp)
+            resp = self._check_and_heal_schema(path, resp)
 
         return resp
 
@@ -235,22 +238,135 @@ class Guardian:
         return self._apply_and_get(path, params)
 
     # ------------------------------------------------------------------ #
-    #  Adapt — schema drift detection                                     #
+    #  Adapt — schema drift detection + healing                          #
     # ------------------------------------------------------------------ #
 
-    def _check_schema(self, path: str, resp: dict) -> None:
+    def _check_and_heal_schema(self, path: str, resp: dict) -> dict:
+        """
+        1. Apply any previously saved key remaps (fast path, no LLM).
+        2. Detect drift vs last-seen keys.
+        3. Fuzzy-match removed keys → new keys; fall back to Brain for
+           anything that can't be resolved heuristically.
+        4. Persist the remap so future calls are transparent.
+        Returns the (possibly remapped) response dict.
+        """
+        # Apply saved remaps so existing nselib code keeps working
+        saved = self._schema_remaps.get(path)
+        if saved:
+            resp = self._remap_dict(resp, saved)
+
         keys = set(resp.keys())
         prev = self._schema.get(path)
+
         if prev is not None and keys != prev:
-            added   = keys - prev
             removed = prev - keys
-            msg = f"[Guardian] Schema drift on '{path}'"
-            if added:
-                msg += f" — NEW keys: {sorted(added)}"
+            added   = keys - prev
+
             if removed:
-                msg += f" — REMOVED keys: {sorted(removed)}"
-            print(msg)
-        self._schema[path] = keys
+                remap: dict[str, str] = {}
+                unmatched: list[str] = []
+
+                for old_k in removed:
+                    match = self._fuzzy_key_match(old_k, added)
+                    if match:
+                        remap[match] = old_k   # rename new API key → old nselib key
+                        print(f"[Guardian] Schema remap '{path}': '{match}' → '{old_k}'")
+                    else:
+                        unmatched.append(old_k)
+
+                if unmatched and self._brain:
+                    brain_remap = self._heal_schema_brain(path, unmatched, added, resp)
+                    remap.update(brain_remap)
+                    unmatched = [k for k in unmatched if k not in {v for v in brain_remap.values()}]
+
+                if unmatched:
+                    print(f"[Guardian] Schema drift on '{path}' — unmapped keys: {sorted(unmatched)}")
+
+                if remap:
+                    with self._lock:
+                        merged = {**self._schema_remaps.get(path, {}), **remap}
+                        self._schema_remaps[path] = merged
+                        self._save_patches()
+                    resp = self._remap_dict(resp, remap)
+
+            elif added:
+                # Only new keys — no breakage, just log
+                print(f"[Guardian] Schema expanded on '{path}': new keys {sorted(added)}")
+
+        self._schema[path] = set(resp.keys())
+        return resp
+
+    def _heal_schema_brain(
+        self,
+        path: str,
+        removed: list[str],
+        added:   set[str],
+        sample:  dict,
+    ) -> dict[str, str]:
+        """Ask Brain to map ambiguous removed keys to their new equivalents."""
+        prompt = (
+            f"NSE API path '{path}' response changed.\n"
+            f"Keys nselib expects but are now missing: {sorted(removed)}\n"
+            f"New keys in the response: {sorted(added)}\n"
+            f"Full response keys: {sorted(sample.keys())}\n\n"
+            f"For each missing key, find its replacement in the new keys "
+            f"(or null if truly gone). Reply ONLY with JSON:\n"
+            f"{{\"<new_api_key>\": \"<old_nselib_key>\", ...}}"
+        )
+        raw  = self._brain.ask(prompt)
+        data = self._parse_json(raw) or {}
+        result = {}
+        for new_k, old_k in data.items():
+            if old_k and isinstance(old_k, str) and new_k in added:
+                result[new_k] = old_k
+                print(f"[Guardian] Brain schema remap '{path}': '{new_k}' → '{old_k}'")
+        return result
+
+    @staticmethod
+    def _remap_dict(resp: dict, remap: dict[str, str]) -> dict:
+        """Rename keys in resp according to remap {current_key: desired_key}."""
+        return {remap.get(k, k): v for k, v in resp.items()}
+
+    @staticmethod
+    def _fuzzy_key_match(target: str, candidates: set[str]) -> str | None:
+        """
+        Return the best match for `target` from `candidates`, or None.
+        Tries (in order): normalised exact, substring containment, edit distance ≤ 2.
+        """
+        if not candidates:
+            return None
+
+        def norm(k: str) -> str:
+            return re.sub(r"[_\-]", "", k.lower())
+
+        t = norm(target)
+
+        # 1. normalised exact match
+        for c in candidates:
+            if norm(c) == t:
+                return c
+
+        # 2. one normalised form contains the other
+        for c in candidates:
+            cn = norm(c)
+            if t in cn or cn in t:
+                return c
+
+        # 3. edit distance ≤ 2 (Levenshtein)
+        def _lev(a: str, b: str) -> int:
+            dp = list(range(len(b) + 1))
+            for ch_a in a:
+                prev, dp[0] = dp[0], dp[0] + 1
+                for j, ch_b in enumerate(b, 1):
+                    prev, dp[j] = dp[j], prev if ch_a == ch_b else 1 + min(prev, dp[j], dp[j-1])
+            return dp[len(b)]
+
+        best, best_d = None, 3
+        for c in candidates:
+            d = _lev(t, norm(c))
+            if d < best_d:
+                best, best_d = c, d
+        return best
 
     # ------------------------------------------------------------------ #
     #  Discover                                                            #
