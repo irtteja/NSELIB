@@ -1,0 +1,25 @@
+[
+  {
+    "date": "2026-10-21",
+    "added": [
+      "APOLLOHOSP",
+      "CIPLA",
+      "DIVISLAB",
+      "EICHERMOT",
+      "HCLTECH",
+      "HINDUNILVR",
+      "INFY",
+      "M&M",
+      "MARUTI",
+      "NESTLEIND",
+      "NIFTY GROWTH SECTORS 15",
+      "SUNPHARMA",
+      "TCS",
+      "TECHM",
+      "TITAN",
+      "TVSMOTOR"
+    ],
+    "removed": [],
+    "total": 16
+  }
+]

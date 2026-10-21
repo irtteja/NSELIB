@@ -1,0 +1,21 @@
+[
+  {
+    "date": "2026-10-21",
+    "added": [
+      "BANKBARODA",
+      "BANKINDIA",
+      "CANBK",
+      "CENTRALBK",
+      "INDIANB",
+      "IOB",
+      "MAHABANK",
+      "PNB",
+      "PSB",
+      "SBIN",
+      "UCOBANK",
+      "UNIONBANK"
+    ],
+    "removed": [],
+    "total": 12
+  }
+]

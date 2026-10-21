@@ -1,0 +1,27 @@
+[
+  {
+    "date": "2026-10-21",
+    "added": [
+      "BEL",
+      "BEML",
+      "BHEL",
+      "BPCL",
+      "CONCOR",
+      "HINDPETRO",
+      "IRCON",
+      "IRCTC",
+      "IRFC",
+      "ITI",
+      "MRPL",
+      "NIFTY INDIA RAILWAYS PSU",
+      "NTPC",
+      "ONGC",
+      "RAILTEL",
+      "RITES",
+      "RVNL",
+      "SAIL"
+    ],
+    "removed": [],
+    "total": 18
+  }
+]

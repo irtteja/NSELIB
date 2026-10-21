@@ -1,0 +1,20 @@
+[
+  {
+    "date": "2026-10-21",
+    "added": [
+      "BEL",
+      "COALINDIA",
+      "COCHINSHIP",
+      "NBCC",
+      "NHPC",
+      "NLCINDIA",
+      "NTPC",
+      "OIL",
+      "ONGC",
+      "POWERGRID",
+      "SJVN"
+    ],
+    "removed": [],
+    "total": 11
+  }
+]

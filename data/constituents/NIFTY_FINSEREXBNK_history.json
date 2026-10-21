@@ -1,0 +1,40 @@
+[
+  {
+    "date": "2026-10-21",
+    "added": [
+      "360ONE",
+      "ABCAPITAL",
+      "ANGELONE",
+      "BAJAJFINSV",
+      "BAJAJHLDNG",
+      "BAJFINANCE",
+      "BSE",
+      "CAMS",
+      "CDSL",
+      "CHOLAFIN",
+      "HDFCAMC",
+      "HDFCLIFE",
+      "ICICIGI",
+      "ICICIPRULI",
+      "IRFC",
+      "JIOFIN",
+      "LICHSGFIN",
+      "LICI",
+      "LTF",
+      "MCX",
+      "MFSL",
+      "MUTHOOTFIN",
+      "NIFTY FINANCIAL SERVICES EX-BANK",
+      "PAYTM",
+      "PFC",
+      "PNBHOUSING",
+      "POLICYBZR",
+      "RECLTD",
+      "SBICARD",
+      "SBILIFE",
+      "SHRIRAMFIN"
+    ],
+    "removed": [],
+    "total": 31
+  }
+]

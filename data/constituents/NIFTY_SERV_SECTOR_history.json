@@ -1,0 +1,40 @@
+[
+  {
+    "date": "2026-10-21",
+    "added": [
+      "ADANIPORTS",
+      "ADANIPOWER",
+      "APOLLOHOSP",
+      "AXISBANK",
+      "BAJAJFINSV",
+      "BAJFINANCE",
+      "BHARTIARTL",
+      "BSE",
+      "DMART",
+      "ETERNAL",
+      "FEDERALBNK",
+      "HCLTECH",
+      "HDFCBANK",
+      "HDFCLIFE",
+      "ICICIBANK",
+      "INDIGO",
+      "INDUSINDBK",
+      "INFY",
+      "JIOFIN",
+      "KOTAKBANK",
+      "MAXHEALTH",
+      "NIFTY SERVICES SECTOR",
+      "NTPC",
+      "POWERGRID",
+      "SBILIFE",
+      "SBIN",
+      "SHRIRAMFIN",
+      "TATAPOWER",
+      "TCS",
+      "TECHM",
+      "WIPRO"
+    ],
+    "removed": [],
+    "total": 31
+  }
+]

@@ -1,0 +1,39 @@
+[
+  {
+    "date": "2026-10-21",
+    "added": [
+      "ADANIENSOL",
+      "ADANIGREEN",
+      "ADANIPOWER",
+      "AMBUJACEM",
+      "APLAPOLLO",
+      "BPCL",
+      "COALINDIA",
+      "GRASIM",
+      "HINDALCO",
+      "HINDPETRO",
+      "IOC",
+      "JINDALSTEL",
+      "JSWENERGY",
+      "JSWSTEEL",
+      "NHPC",
+      "NMDC",
+      "NTPC",
+      "OIL",
+      "ONGC",
+      "PIDILITIND",
+      "RELIANCE",
+      "SHREECEM",
+      "SRF",
+      "TATAPOWER",
+      "TATASTEEL",
+      "TORNTPOWER",
+      "ULTRACEMCO",
+      "UPL",
+      "VAML",
+      "VEDL"
+    ],
+    "removed": [],
+    "total": 30
+  }
+]

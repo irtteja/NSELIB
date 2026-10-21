@@ -1,0 +1,29 @@
+[
+  {
+    "date": "2026-10-21",
+    "added": [
+      "BEL",
+      "BHEL",
+      "BPCL",
+      "COALINDIA",
+      "CONCOR",
+      "GAIL",
+      "HAL",
+      "HINDPETRO",
+      "IOC",
+      "IRFC",
+      "NATIONALUM",
+      "NHPC",
+      "NMDC",
+      "NTPC",
+      "OIL",
+      "ONGC",
+      "PFC",
+      "POWERGRID",
+      "RECLTD",
+      "SAIL"
+    ],
+    "removed": [],
+    "total": 20
+  }
+]

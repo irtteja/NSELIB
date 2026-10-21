@@ -1,0 +1,39 @@
+[
+  {
+    "date": "2026-10-21",
+    "added": [
+      "ADANIPORTS",
+      "ASHOKLEY",
+      "BAJAJ-AUTO",
+      "BALKRISIND",
+      "BHARATFORG",
+      "BOSCHLTD",
+      "BPCL",
+      "CONCOR",
+      "DELHIVERY",
+      "EICHERMOT",
+      "ETERNAL",
+      "GAIL",
+      "GMRAIRPORT",
+      "HEROMOTOCO",
+      "HINDPETRO",
+      "HYUNDAI",
+      "INDIGO",
+      "IOC",
+      "M&M",
+      "MARUTI",
+      "MOTHERSON",
+      "MRF",
+      "PETRONET",
+      "RELIANCE",
+      "SONACOMS",
+      "SWIGGY",
+      "TIINDIA",
+      "TMCV",
+      "TMPV",
+      "TVSMOTOR"
+    ],
+    "removed": [],
+    "total": 30
+  }
+]

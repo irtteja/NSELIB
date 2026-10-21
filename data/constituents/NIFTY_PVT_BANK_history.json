@@ -1,0 +1,20 @@
+[
+  {
+    "date": "2026-10-21",
+    "added": [
+      "AXISBANK",
+      "BANDHANBNK",
+      "FEDERALBNK",
+      "HDFCBANK",
+      "ICICIBANK",
+      "IDFCFIRSTB",
+      "INDUSINDBK",
+      "KOTAKBANK",
+      "NIFTY PRIVATE BANK",
+      "RBLBANK",
+      "YESBANK"
+    ],
+    "removed": [],
+    "total": 11
+  }
+]
