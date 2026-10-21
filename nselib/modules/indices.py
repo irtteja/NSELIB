@@ -1,5 +1,6 @@
 from datetime import date, timedelta
 from typing import Any
+from urllib.parse import quote
 
 from ..exceptions import NSEDataError
 
@@ -34,6 +35,25 @@ class IndicesMixin:
             if item.get("index", "").upper() == index.upper():
                 return item
         raise NSEDataError(f"Index not found: {index!r}. Use list_indices() to see all names.")
+
+    def index_constituents(self, index: str) -> list[dict]:
+        """
+        Live prices for all stocks in a given index.
+        e.g. index_constituents("NIFTY 50"), index_constituents("NIFTY BANK")
+
+        Each record has: symbol, companyName, lastPrice, change, pChange,
+        open, dayHigh, dayLow, previousClose, totalTradedVolume,
+        totalTradedValue, yearHigh, yearLow, perChange30d, perChange365d.
+
+        The first record is the index itself; the rest are its constituent stocks.
+        """
+        url = (
+            "https://www.nseindia.com/api/NextApi/apiClient/marketWatchApi"
+            f"?functionName=getIndicesData&symbol={quote(index)}"
+        )
+        resp = self._session.get_raw(url)
+        data = resp.json()
+        return data.get("data", {}).get("data", [])
 
     def fetch_index_names(self) -> dict[str, str]:
         """Return {short_name: full_name} mapping for all indices."""
