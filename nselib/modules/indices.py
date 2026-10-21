@@ -18,7 +18,28 @@ _BHAV_COLS = [
     "TradDt", "TckrSymb", "SctySrs",
     "OpnPric", "HghPric", "LwPric", "ClsPric", "PrvsClsgPric",
     "TtlTradgVol", "TtlTrfVal", "TtlNbOfTxsExctd", "ISIN",
+    "DELIV_QTY", "DELIV_PER",
 ]
+
+
+def _parse_mto(mto_path: Path) -> dict[tuple[str, str], tuple[str, str]]:
+    """Parse NSE MTO DAT file → {(symbol, series): (deliv_qty, deliv_per)}
+
+    Format: record_type=20, cols: rec_type, sr_no, symbol, series,
+            traded_qty, deliv_qty, deliv_pct
+    """
+    result: dict[tuple[str, str], tuple[str, str]] = {}
+    try:
+        with open(mto_path, newline="") as f:
+            for row in csv.reader(f):
+                if len(row) < 7 or row[0].strip() != "20":
+                    continue
+                result[(row[2].strip(), row[3].strip())] = (
+                    row[5].strip(), row[6].strip()
+                )
+    except Exception:
+        pass
+    return result
 # Only equity cash-market series
 _EQ_SERIES = {"EQ", "BE", "BZ", "SM", "ST"}
 
@@ -326,7 +347,7 @@ class IndicesMixin:
         Output: data/bhav/constituents_1y.csv
         Columns: TradDt, TckrSymb, SctySrs, OpnPric, HghPric, LwPric,
                  ClsPric, PrvsClsgPric, TtlTradgVol, TtlTrfVal,
-                 TtlNbOfTxsExctd, ISIN
+                 TtlNbOfTxsExctd, ISIN, DELIV_QTY, DELIV_PER
 
         Returns the path to the CSV.
         """
@@ -358,6 +379,10 @@ class IndicesMixin:
             if existing:
                 last_saved = max(r["TradDt"] for r in existing)
                 existing_symbols = {r["TckrSymb"] for r in existing}
+                # backfill delivery columns for rows that predate this feature
+                for r in existing:
+                    r.setdefault("DELIV_QTY", "")
+                    r.setdefault("DELIV_PER", "")
 
         to_date = date.today() - timedelta(days=1)
         cutoff  = (date.today() - timedelta(days=365)).isoformat()
@@ -395,6 +420,16 @@ class IndicesMixin:
             tmp = Path(tempfile.mkdtemp())
             try:
                 csv_path = self.equity_bhavcopy(dt=dt, folder=tmp)
+
+                # Try to get delivery data; silently skip if unavailable
+                delivery: dict[tuple[str, str], tuple[str, str]] = {}
+                try:
+                    mto_path = self.delivery_bhavcopy(dt=dt, folder=tmp)
+                    delivery = _parse_mto(mto_path)
+                    mto_path.unlink(missing_ok=True)
+                except Exception:
+                    pass
+
                 rows = []
                 with open(csv_path, newline="", encoding="utf-8-sig") as f:
                     reader = csv.DictReader(f)
@@ -402,7 +437,11 @@ class IndicesMixin:
                         sym    = row.get("TckrSymb", "").strip()
                         series = row.get("SctySrs",  "").strip()
                         if sym in filter_symbols and series in _EQ_SERIES:
-                            rows.append({c: row.get(c, "") for c in _BHAV_COLS})
+                            r = {c: row.get(c, "") for c in _BHAV_COLS}
+                            dq, dp = delivery.get((sym, series), ("", ""))
+                            r["DELIV_QTY"] = dq
+                            r["DELIV_PER"] = dp
+                            rows.append(r)
                 csv_path.unlink(missing_ok=True)
                 return dt, rows, None
             except Exception as exc:
