@@ -235,3 +235,30 @@ class MarketMixin:
             },
         )
         return resp.get("data", resp) if isinstance(resp, dict) else resp
+
+    def get_fii_dii_trade_react(self):
+        """FII/DII provisional trading activity (buy/sell/net values)."""
+        path = "fiidiiTradeReact"
+        return (self._guardian.guarded_get if self._guardian else self._session.get)(path, None)
+
+    def get_live_variations(self, index="gainers"):
+        """Live top gainers/losers. index: 'gainers' or 'loosers' (NSE's spelling)."""
+        path = "live-analysis-variations"
+        params = {"index": index}
+        return (self._guardian.guarded_get if self._guardian else self._session.get)(path, params)
+
+    def get_price_band_hitters(self):
+        """Securities currently hitting their upper/lower price bands."""
+        path = "live-analysis-price-band-hitter"
+        return (self._guardian.guarded_get if self._guardian else self._session.get)(path, None)
+
+    def live_analysis_variations(self, index: str = "gainers", params: dict = None):
+        """Fetch live market variations (e.g. top gainers/losers).
+    
+        index: variation category passed to the API (default 'gainers').
+        params: optional extra query parameters; merged over the defaults.
+        """
+        query = {"index": index}
+        if params:
+            query.update(params)
+        return (self._guardian.guarded_get if self._guardian else self._session.get)("live-analysis-variations", query)

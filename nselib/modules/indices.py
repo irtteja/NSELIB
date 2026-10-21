@@ -531,3 +531,8 @@ class IndicesMixin:
                 rows.extend(chunk)
 
         return rows
+
+    def get_index_names(self):
+        """List of all NSE index names grouped by category."""
+        path = "index-names"
+        return (self._guardian.guarded_get if self._guardian else self._session.get)(path, None)

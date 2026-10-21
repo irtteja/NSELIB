@@ -183,3 +183,23 @@ class FnoMixin:
             params={"functionName": "getSymbolDerivativesData", "symbol": symbol.upper()},
         )
         return raw
+
+    def get_oi_spurts_underlyings(self):
+        """Open interest spurts aggregated by underlying."""
+        path = "live-analysis-oi-spurts-underlyings"
+        return (self._guardian.guarded_get if self._guardian else self._session.get)(path, None)
+
+    def get_oi_spurts_contracts(self):
+        """Open interest spurts by individual derivative contract."""
+        path = "live-analysis-oi-spurts-contracts"
+        return (self._guardian.guarded_get if self._guardian else self._session.get)(path, None)
+
+    def get_derivatives_equity_snapshot(self, index="futures"):
+        """Equity derivatives snapshot. index: 'futures' or 'options'."""
+        path = "snapshot-derivatives-equity"
+        params = {"index": index}
+        return (self._guardian.guarded_get if self._guardian else self._session.get)(path, params)
+
+    def snapshot_derivatives_equity(self, symbol: str):
+        """Fetch the derivatives snapshot (futures/options) for an equity symbol."""
+        return (self._guardian.guarded_get if self._guardian else self._session.get)("snapshot-derivatives-equity", {"symbol": symbol.upper()})

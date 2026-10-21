@@ -114,3 +114,8 @@ class QuotesMixin:
     def get_detailed_scrip_data(self, symbol: str, series: str = "EQ") -> dict:
         """Full quote dict including order book, trade info, and price info."""
         return self.quote(symbol, series)
+
+    def get_equity_master(self):
+        """Equity master: indices/categories mapped to their constituent equity segments."""
+        path = "equity-master"
+        return (self._guardian.guarded_get if self._guardian else self._session.get)(path, None)
