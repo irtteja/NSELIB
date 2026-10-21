@@ -190,6 +190,9 @@ class IndicesMixin:
                 "removed": removed,
                 "total":   len(symbols),
             })
+            # drop entries older than 1 year
+            cutoff = (date.today() - timedelta(days=365)).isoformat()
+            history = [e for e in history if e.get("date", "") >= cutoff]
             history_file.write_text(json.dumps(history, indent=2))
 
         return {
