@@ -274,3 +274,8 @@ class MarketMixin:
         path = "fiidiiTradeReact"
         params = {}
         return (self._guardian.guarded_get if self._guardian else self._session.get)(path, params)
+
+    def get_live_analysis_variations(self, index: str = "gainers"):
+        """Live top gainers/losers variations. index: 'gainers' or 'loosers'."""
+        params = {"index": index}
+        return (self._guardian.guarded_get if self._guardian else self._session.get)("live-analysis-variations", params)

@@ -203,3 +203,8 @@ class FnoMixin:
     def snapshot_derivatives_equity(self, symbol: str):
         """Fetch the derivatives snapshot (futures/options) for an equity symbol."""
         return (self._guardian.guarded_get if self._guardian else self._session.get)("snapshot-derivatives-equity", {"symbol": symbol.upper()})
+
+    def get_snapshot_derivatives_equity(self, index: str = "futures"):
+        """Equity derivatives snapshot. index: 'futures' or 'options'."""
+        params = {"index": index}
+        return (self._guardian.guarded_get if self._guardian else self._session.get)("snapshot-derivatives-equity", params)
