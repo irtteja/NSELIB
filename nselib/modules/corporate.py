@@ -161,3 +161,58 @@ class CorporateMixin:
         """
         resp = self._session.get("event-calendar")
         return resp if isinstance(resp, list) else resp.get("data", resp)
+
+    def corporate_pledge_data(self, symbol=None, from_date=None, to_date=None, index='equities'):
+        """Promoter shares pledge data."""
+        params = {'index': index}
+        if symbol:
+            params['symbol'] = symbol.upper()
+        if from_date:
+            params['from_date'] = from_date
+        if to_date:
+            params['to_date'] = to_date
+        return (self._guardian.guarded_get if self._guardian else self._session.get)('corporate-pledgedata', params)
+
+    def corporate_voting_results(self, symbol=None, from_date=None, to_date=None, index='equities'):
+        """Shareholder voting results."""
+        params = {'index': index}
+        if symbol:
+            params['symbol'] = symbol.upper()
+        if from_date:
+            params['from_date'] = from_date
+        if to_date:
+            params['to_date'] = to_date
+        return (self._guardian.guarded_get if self._guardian else self._session.get)('corporate-voting-results', params)
+
+    def corporate_actions_rights(self, symbol=None, from_date=None, to_date=None):
+        """Rights issue corporate actions."""
+        params = {'index': 'equities', 'subject': 'rights'}
+        if symbol:
+            params['symbol'] = symbol.upper()
+        if from_date:
+            params['from_date'] = from_date
+        if to_date:
+            params['to_date'] = to_date
+        return (self._guardian.guarded_get if self._guardian else self._session.get)('corporates-corporateActions', params)
+
+    def insider_trading_pit(self, symbol=None, from_date=None, to_date=None):
+        """Insider trading disclosures (SEBI PIT)."""
+        params = {'index': 'equities'}
+        if symbol:
+            params['symbol'] = symbol.upper()
+        if from_date:
+            params['from_date'] = from_date
+        if to_date:
+            params['to_date'] = to_date
+        return (self._guardian.guarded_get if self._guardian else self._session.get)('corporates-pit', params)
+
+    def sast_reg29(self, symbol=None, from_date=None, to_date=None, index='equities'):
+        """SAST Regulation 29 substantial acquisition disclosures."""
+        params = {'index': index}
+        if symbol:
+            params['symbol'] = symbol.upper()
+        if from_date:
+            params['from_date'] = from_date
+        if to_date:
+            params['to_date'] = to_date
+        return (self._guardian.guarded_get if self._guardian else self._session.get)('corporate-sast-reg29', params)

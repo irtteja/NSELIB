@@ -424,14 +424,27 @@ class Guardian:
     #  Discover                                                            #
     # ------------------------------------------------------------------ #
 
-    def discover(self) -> list[dict]:
+    def discover(self, focus: str | None = None) -> list[dict]:
         """
         Ask Claude to suggest NSE API endpoints not yet in nselib, then
         probe each candidate directly to confirm it's live.
         Works on any IP — no JS bundle scraping needed.
         Returns list of discovery dicts with confirmed live endpoints.
+
+        Args:
+            focus: Optional area to target, e.g.
+                   "insider trading, block/bulk deals, corporate governance".
+                   When None, uses the default broad discovery prompt.
         """
         print("[Guardian] Asking Claude for undiscovered NSE endpoints…")
+
+        focus_line = (
+            f"Focus specifically on: {focus}"
+            if focus else
+            "Focus on: FII/DII data, put-call ratio, OI analysis, "
+            "52-week data, circuit breakers, deliverable positions, VIX, "
+            "currency/commodity derivatives that definitely exist."
+        )
 
         prompt = (
             f"You are an expert on NSE India's undocumented REST API at "
@@ -440,9 +453,7 @@ class Guardian:
             f"{json.dumps(sorted(_KNOWN_PATHS), indent=2)}\n\n"
             f"List the TOP 20 most useful NSE API paths that nselib is likely MISSING. "
             f"Be specific and high-confidence only — paths you are fairly certain exist "
-            f"(not guesses). Focus on: FII/DII data, put-call ratio, OI analysis, "
-            f"52-week data, circuit breakers, deliverable positions, VIX, "
-            f"currency/commodity derivatives that definitely exist.\n\n"
+            f"(not guesses). {focus_line}\n\n"
             f"Reply ONLY with a JSON array of up to 20 candidate paths "
             f"(relative, no /api/ prefix):\n"
             f'["path1", "path2", ...]'
