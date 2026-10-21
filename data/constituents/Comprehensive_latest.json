@@ -1,0 +1,250 @@
+{
+  "date": "2026-10-21",
+  "total_indices": 4,
+  "total_stocks": 74,
+  "stocks": {
+    "ADANIENT": [
+      "NIFTY 50"
+    ],
+    "ADANIPORTS": [
+      "NIFTY 50"
+    ],
+    "APOLLOHOSP": [
+      "NIFTY 50"
+    ],
+    "ASIANPAINT": [
+      "NIFTY 50"
+    ],
+    "AUBANK": [
+      "NIFTY BANK"
+    ],
+    "AXISBANK": [
+      "NIFTY 50",
+      "NIFTY BANK",
+      "NIFTY FIN SERVICE"
+    ],
+    "BAJAJ-AUTO": [
+      "NIFTY 50"
+    ],
+    "BAJAJFINSV": [
+      "NIFTY 50",
+      "NIFTY FIN SERVICE"
+    ],
+    "BAJFINANCE": [
+      "NIFTY 50",
+      "NIFTY FIN SERVICE"
+    ],
+    "BANKBARODA": [
+      "NIFTY BANK"
+    ],
+    "BEL": [
+      "NIFTY 50"
+    ],
+    "BHARTIARTL": [
+      "NIFTY 50"
+    ],
+    "BSE": [
+      "NIFTY 50",
+      "NIFTY FIN SERVICE"
+    ],
+    "CANBK": [
+      "NIFTY BANK"
+    ],
+    "CHOLAFIN": [
+      "NIFTY FIN SERVICE"
+    ],
+    "CIPLA": [
+      "NIFTY 50"
+    ],
+    "COALINDIA": [
+      "NIFTY 50"
+    ],
+    "COFORGE": [
+      "NIFTY IT"
+    ],
+    "DRREDDY": [
+      "NIFTY 50"
+    ],
+    "EICHERMOT": [
+      "NIFTY 50"
+    ],
+    "ETERNAL": [
+      "NIFTY 50"
+    ],
+    "FEDERALBNK": [
+      "NIFTY BANK"
+    ],
+    "GRASIM": [
+      "NIFTY 50"
+    ],
+    "HCLTECH": [
+      "NIFTY 50",
+      "NIFTY IT"
+    ],
+    "HDFCBANK": [
+      "NIFTY 50",
+      "NIFTY BANK",
+      "NIFTY FIN SERVICE"
+    ],
+    "HDFCLIFE": [
+      "NIFTY 50",
+      "NIFTY FIN SERVICE"
+    ],
+    "HINDALCO": [
+      "NIFTY 50"
+    ],
+    "HINDUNILVR": [
+      "NIFTY 50"
+    ],
+    "ICICIBANK": [
+      "NIFTY 50",
+      "NIFTY BANK",
+      "NIFTY FIN SERVICE"
+    ],
+    "ICICIGI": [
+      "NIFTY FIN SERVICE"
+    ],
+    "IDFCFIRSTB": [
+      "NIFTY BANK"
+    ],
+    "INDIGO": [
+      "NIFTY 50"
+    ],
+    "INDUSINDBK": [
+      "NIFTY BANK"
+    ],
+    "INFY": [
+      "NIFTY 50",
+      "NIFTY IT"
+    ],
+    "ITC": [
+      "NIFTY 50"
+    ],
+    "JIOFIN": [
+      "NIFTY 50",
+      "NIFTY FIN SERVICE"
+    ],
+    "JSWSTEEL": [
+      "NIFTY 50"
+    ],
+    "KOTAKBANK": [
+      "NIFTY 50",
+      "NIFTY BANK",
+      "NIFTY FIN SERVICE"
+    ],
+    "LICHSGFIN": [
+      "NIFTY FIN SERVICE"
+    ],
+    "LT": [
+      "NIFTY 50"
+    ],
+    "LTM": [
+      "NIFTY IT"
+    ],
+    "M&M": [
+      "NIFTY 50"
+    ],
+    "MARUTI": [
+      "NIFTY 50"
+    ],
+    "MAXHEALTH": [
+      "NIFTY 50"
+    ],
+    "MFSL": [
+      "NIFTY FIN SERVICE"
+    ],
+    "MPHASIS": [
+      "NIFTY IT"
+    ],
+    "MUTHOOTFIN": [
+      "NIFTY FIN SERVICE"
+    ],
+    "NESTLEIND": [
+      "NIFTY 50"
+    ],
+    "NIFTY FINANCIAL SERVICES": [
+      "NIFTY FIN SERVICE"
+    ],
+    "NTPC": [
+      "NIFTY 50"
+    ],
+    "OFSS": [
+      "NIFTY IT"
+    ],
+    "ONGC": [
+      "NIFTY 50"
+    ],
+    "PERSISTENT": [
+      "NIFTY IT"
+    ],
+    "PFC": [
+      "NIFTY FIN SERVICE"
+    ],
+    "PNB": [
+      "NIFTY BANK"
+    ],
+    "POWERGRID": [
+      "NIFTY 50"
+    ],
+    "RECLTD": [
+      "NIFTY FIN SERVICE"
+    ],
+    "RELIANCE": [
+      "NIFTY 50"
+    ],
+    "SBICARD": [
+      "NIFTY FIN SERVICE"
+    ],
+    "SBILIFE": [
+      "NIFTY 50",
+      "NIFTY FIN SERVICE"
+    ],
+    "SBIN": [
+      "NIFTY 50",
+      "NIFTY BANK",
+      "NIFTY FIN SERVICE"
+    ],
+    "SHRIRAMFIN": [
+      "NIFTY 50",
+      "NIFTY FIN SERVICE"
+    ],
+    "SUNPHARMA": [
+      "NIFTY 50"
+    ],
+    "TATACONSUM": [
+      "NIFTY 50"
+    ],
+    "TATASTEEL": [
+      "NIFTY 50"
+    ],
+    "TCS": [
+      "NIFTY 50",
+      "NIFTY IT"
+    ],
+    "TECHM": [
+      "NIFTY 50",
+      "NIFTY IT"
+    ],
+    "TITAN": [
+      "NIFTY 50"
+    ],
+    "TMPV": [
+      "NIFTY 50"
+    ],
+    "TRENT": [
+      "NIFTY 50"
+    ],
+    "ULTRACEMCO": [
+      "NIFTY 50"
+    ],
+    "UNIONBANK": [
+      "NIFTY BANK"
+    ],
+    "WIPRO": [
+      "NIFTY IT"
+    ],
+    "YESBANK": [
+      "NIFTY BANK"
+    ]
+  }
+}

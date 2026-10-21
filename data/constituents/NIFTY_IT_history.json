@@ -1,0 +1,19 @@
+[
+  {
+    "date": "2026-10-21",
+    "added": [
+      "COFORGE",
+      "HCLTECH",
+      "INFY",
+      "LTM",
+      "MPHASIS",
+      "OFSS",
+      "PERSISTENT",
+      "TCS",
+      "TECHM",
+      "WIPRO"
+    ],
+    "removed": [],
+    "total": 10
+  }
+]

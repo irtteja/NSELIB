@@ -1,0 +1,23 @@
+[
+  {
+    "date": "2026-10-21",
+    "added": [
+      "AUBANK",
+      "AXISBANK",
+      "BANKBARODA",
+      "CANBK",
+      "FEDERALBNK",
+      "HDFCBANK",
+      "ICICIBANK",
+      "IDFCFIRSTB",
+      "INDUSINDBK",
+      "KOTAKBANK",
+      "PNB",
+      "SBIN",
+      "UNIONBANK",
+      "YESBANK"
+    ],
+    "removed": [],
+    "total": 14
+  }
+]
