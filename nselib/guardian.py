@@ -102,17 +102,23 @@ class Guardian:
     """
 
     def __init__(self, session: NSESession, brain: Brain,
-                 patches_file: str | Path | None = None):
+                 patches_file: str | Path | None = None,
+                 log_file: str | Path | None = None):
         self._session     = session
         self._brain       = brain
         self._raw_get     = session.get   # original get, captured before any monkey-patch
         self._lock        = threading.Lock()
-        self._patches:       dict[str, dict]        = {}   # path → {headers, params, new_path}
-        self._schema_remaps: dict[str, dict[str,str]] = {}   # path → {api_key: nselib_key}
-        self._schema:        dict[str, set]           = {}   # path → last-seen top-level keys
-        self._heal_log:      list[dict]               = []   # what was healed and when
-        self._discoveries: list[dict]      = []   # new endpoints Claude found
+        self._patches:       dict[str, dict]          = {}
+        self._schema_remaps: dict[str, dict[str, str]] = {}
+        self._schema:        dict[str, set]            = {}
+        self._heal_log:      list[dict]                = []
+        self._discoveries:   list[dict]                = []
         self._patches_file: Path | None = Path(patches_file) if patches_file else None
+        # persistent audit log — defaults to ~/.nselib/guardian_log.json
+        self._log_file: Path = (
+            Path(log_file) if log_file
+            else Path.home() / ".nselib" / "guardian_log.json"
+        )
         self._load_patches()
 
     # ------------------------------------------------------------------ #
@@ -148,6 +154,22 @@ class Guardian:
             self._patches_file.write_text(json.dumps(data, indent=2))
         except Exception as e:
             print(f"[Guardian] Could not save patches file: {e}")
+
+    def _log(self, event: str, **kwargs) -> None:
+        """Append one event to the persistent guardian_log.json."""
+        entry = {"ts": datetime.now().isoformat(), "event": event, **kwargs}
+        try:
+            self._log_file.parent.mkdir(parents=True, exist_ok=True)
+            log: list = []
+            if self._log_file.exists():
+                try:
+                    log = json.loads(self._log_file.read_text())
+                except Exception:
+                    log = []
+            log.append(entry)
+            self._log_file.write_text(json.dumps(log, indent=2))
+        except Exception as exc:
+            print(f"[Guardian] Could not write log: {exc}")
 
     # ------------------------------------------------------------------ #
     #  Heal                                                               #
@@ -252,14 +274,17 @@ class Guardian:
                 self._patches[path] = patch
             if fix.get("cookie_ttl_seconds"):
                 self._session._COOKIE_TTL = fix["cookie_ttl_seconds"]
-            self._heal_log.append({
+            entry = {
                 "ts":          datetime.now().isoformat(),
                 "path":        path,
                 "explanation": fix.get("explanation", ""),
                 "patch":       patch,
-            })
+            }
+            self._heal_log.append(entry)
             self._save_patches()
 
+        self._log("heal", path=path, patch=patch,
+                  explanation=fix.get("explanation", ""))
         print(f"[Guardian] Patch applied: {fix.get('explanation', 'unknown')}")
         return self._apply_and_get(path, params)
 
@@ -313,6 +338,7 @@ class Guardian:
                         merged = {**self._schema_remaps.get(path, {}), **remap}
                         self._schema_remaps[path] = merged
                         self._save_patches()
+                    self._log("adapt", path=path, remap=remap)
                     resp = self._remap_dict(resp, remap)
 
             elif added:
@@ -481,6 +507,9 @@ class Guardian:
             self._discoveries.extend(discoveries)
             _KNOWN_PATHS.update(d["path"] for d in discoveries if "path" in d)
 
+        self._log("discover",
+                  live_endpoints=live,
+                  methods_generated=[d.get("method_name") for d in discoveries])
         return discoveries
 
     def apply(self, nselib_dir: str | Path) -> list[str]:
@@ -520,9 +549,108 @@ class Guardian:
             updated  = current.rstrip("\n") + f"\n\n    {indented}\n"
             target.write_text(updated)
             modified.append(str(target))
+            self._log("apply", method=d.get("method_name"),
+                      module=module, path=d.get("path"))
             print(f"[Guardian] Added '{d.get('method_name')}' to {module}.py (guardian-wrapped)")
 
         return modified
+
+    def verify(self, nselib_dir: str | Path, nse_instance=None) -> list[dict]:
+        """
+        Test every method written by apply(). For each one:
+          1. Call it with no args (or minimal sample args)
+          2. If it returns non-empty data → PASS
+          3. If it fails or returns empty → ask Claude to fix the method and rewrite it
+
+        Returns a list of {method, status, detail} dicts.
+        """
+        import importlib, inspect, sys as _sys
+
+        base    = Path(nselib_dir) / "nselib" / "modules"
+        results = []
+
+        # reuse a live NSE instance if provided, otherwise use session directly
+        from .nse import NSE as _NSE
+        nse = nse_instance or _NSE.__new__(_NSE)
+        if nse_instance is None:
+            nse._session = self._session
+            nse._brain   = self._brain
+            nse._guardian = self
+
+        for d in self._discoveries:
+            method_name = d.get("method_name")
+            module      = d.get("module")
+            path        = d.get("path", "")
+            if not method_name or not module:
+                continue
+
+            # reload the module so the newly written method is importable
+            mod_path = f"nselib.modules.{module}"
+            try:
+                if mod_path in _sys.modules:
+                    importlib.reload(_sys.modules[mod_path])
+            except Exception:
+                pass
+
+            method = getattr(nse, method_name, None)
+            if method is None:
+                results.append({"method": method_name, "status": "missing",
+                                "detail": "method not found on NSE instance after reload"})
+                self._log("verify", method=method_name, status="missing")
+                continue
+
+            # call with no args; catch any error
+            try:
+                resp = method()
+                if resp and not self._is_broken(resp):
+                    results.append({"method": method_name, "status": "pass",
+                                    "detail": f"returned {type(resp).__name__}"})
+                    self._log("verify", method=method_name, status="pass")
+                    print(f"[Guardian] ✓ {method_name}")
+                    continue
+                else:
+                    raise ValueError("empty response")
+            except Exception as exc:
+                print(f"[Guardian] ✗ {method_name} failed: {exc} — asking Claude to fix…")
+
+                # ask Claude to fix the method
+                target  = base / f"{module}.py"
+                current = target.read_text() if target.exists() else ""
+                fix_prompt = (
+                    f"The nselib method `{method_name}` for NSE path `{path}` "
+                    f"failed when called with no arguments. Error: {exc}\n\n"
+                    f"Current implementation:\n{d.get('method_code', '')}\n\n"
+                    f"Fix the method so it works with sensible defaults for any "
+                    f"required parameters. Use guarded_get pattern. "
+                    f"Reply with ONLY the corrected method code (no JSON wrapper)."
+                )
+                fixed_code = self._brain.ask(fix_prompt).strip()
+                # strip markdown fences if present
+                fixed_code = re.sub(r"^```python\s*|^```\s*|```$", "",
+                                    fixed_code, flags=re.MULTILINE).strip()
+
+                if fixed_code and target.exists():
+                    # replace old method body in file
+                    old_code = d.get("method_code", "").strip()
+                    old_indented = "\n    ".join(old_code.splitlines())
+                    new_indented = "\n    ".join(fixed_code.splitlines())
+                    updated = current.replace(f"    {old_indented}", f"    {new_indented}", 1)
+                    if updated != current:
+                        target.write_text(updated)
+                        d["method_code"] = fixed_code  # update in-memory record
+                        detail = "fixed and rewritten"
+                        print(f"[Guardian] Fixed and rewrote {method_name}")
+                    else:
+                        detail = f"fix generated but could not splice into file: {exc}"
+                else:
+                    detail = f"unfixable: {exc}"
+
+                results.append({"method": method_name, "status": "fixed" if "rewritten" in detail else "failed",
+                                "detail": detail})
+                self._log("verify", method=method_name, status="fixed" if "rewritten" in detail else "failed",
+                          error=str(exc), detail=detail)
+
+        return results
 
     def watch(self, interval: int = 3600) -> None:
         """
@@ -628,16 +756,20 @@ class Guardian:
             print("[Guardian] Healing bhavcopy…")
             try:
                 nse.fetch_constituent_bhav_history(workers=4)
+                self._log("data_heal", pipeline="bhav", status="healed")
                 print("[Guardian] Bhavcopy healed.")
             except Exception as exc:
+                self._log("data_heal", pipeline="bhav", status="failed", error=str(exc))
                 print(f"[Guardian] Bhavcopy heal failed: {exc}")
 
         if health.get("constituents", {}).get("status") == "stale":
             print("[Guardian] Healing constituents…")
             try:
                 nse.snapshot_all_constituents(workers=4)
+                self._log("data_heal", pipeline="constituents", status="healed")
                 print("[Guardian] Constituents healed.")
             except Exception as exc:
+                self._log("data_heal", pipeline="constituents", status="failed", error=str(exc))
                 print(f"[Guardian] Constituents heal failed: {exc}")
 
         return self.check_health()
