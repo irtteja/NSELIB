@@ -423,9 +423,11 @@ class IndicesMixin:
 
                 # Try to get delivery data; silently skip if unavailable
                 delivery: dict[tuple[str, str], tuple[str, str]] = {}
+                got_delivery = False
                 try:
                     mto_path = self.delivery_bhavcopy(dt=dt, folder=tmp)
                     delivery = _parse_mto(mto_path)
+                    got_delivery = bool(delivery)
                     mto_path.unlink(missing_ok=True)
                 except Exception:
                     pass
@@ -443,13 +445,13 @@ class IndicesMixin:
                             r["DELIV_PER"] = dp
                             rows.append(r)
                 csv_path.unlink(missing_ok=True)
-                return dt, rows, None
+                return dt, rows, None, got_delivery
             except Exception as exc:
-                return dt, [], exc
+                return dt, [], exc, False
             finally:
                 import shutil; shutil.rmtree(tmp, ignore_errors=True)
 
-        ok = err = 0
+        ok = err = deliv_ok = deliv_miss = 0
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
             futures = {}
             for d in incremental_days:
@@ -460,14 +462,19 @@ class IndicesMixin:
                 if d not in incremental_set:
                     futures[pool.submit(_fetch_day, d, new_symbols)] = d
             for fut in concurrent.futures.as_completed(futures):
-                dt, rows, exc = fut.result()
+                dt, rows, exc, got_delivery = fut.result()
                 if exc:
                     err += 1
                 else:
                     new_rows.extend(rows)
                     ok += 1
+                    if got_delivery:
+                        deliv_ok += 1
+                    else:
+                        deliv_miss += 1
 
-        print(f"  bhav: {ok} days ok, {err} failed (holidays/closures)")
+        print(f"  bhav: {ok} days ok, {err} failed (holidays/closures) | "
+              f"delivery: {deliv_ok} days with MTO, {deliv_miss} without")
 
         if not new_rows and not existing:
             return out_file
