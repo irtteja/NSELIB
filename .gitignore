@@ -9,6 +9,7 @@ build/
 # NSE session cookies and downloaded files
 nse_cookies.json
 *.csv
+!data/bhav/constituents_1y.csv
 *.zip
 *.gz
 *.DAT
