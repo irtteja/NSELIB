@@ -10,6 +10,25 @@ from ..exceptions import NSEDataError
 
 _STORE = Path.home() / ".nselib" / "constituents"
 
+# Indices confirmed to return constituent stock data via the marketWatchApi.
+# The other 96 indices (bond, leverage/inverse, VIX, many strategy/thematic)
+# return empty constituent lists from NSE's API.
+INDICES_WITH_CONSTITUENTS: list[str] = [
+    "NIFTY 50", "NIFTY NEXT 50", "NIFTY 100", "NIFTY 200", "NIFTY 500",
+    "NIFTY MIDCAP 50", "NIFTY MIDCAP 100", "NIFTY MIDCAP 150",
+    "NIFTY SMALLCAP 500", "NIFTY SME EMERGE",
+    "NIFTY BANK", "NIFTY IT", "NIFTY AUTO", "NIFTY PHARMA", "NIFTY FMCG",
+    "NIFTY METAL", "NIFTY MEDIA", "NIFTY REALTY", "NIFTY ENERGY",
+    "NIFTY PSU BANK", "NIFTY PSE", "NIFTY CPSE", "NIFTY MNC",
+    "NIFTY COMMODITIES", "NIFTY CHEMICALS", "NIFTY CEMENT",
+    "NIFTY MOBILITY", "NIFTY HOUSING", "NIFTY RURAL", "NIFTY WAVES",
+    "NIFTY IPO", "NIFTY100 ESG",
+    "NIFTY ALPHA 50", "NIFTY50 VALUE 20", "NIFTY50 SHARIAH",
+    "NIFTY SHARIAH 25", "NIFTY500 SHARIAH",
+    "NIFTY200 ALPHA 30", "NIFTY100 ALPHA 30", "NIFTY200 VALUE 30",
+    "NIFTY500 VALUE 50",
+]
+
 
 def _index_key(index: str) -> str:
     return index.upper().replace(" ", "_").replace("&", "AND")
@@ -151,6 +170,38 @@ class IndicesMixin:
         if not history_file.exists():
             return []
         return json.loads(history_file.read_text())
+
+    def snapshot_all_constituents(self, workers: int = 4) -> dict[str, dict]:
+        """
+        Snapshot constituents for all 41 indices that expose stock-level
+        data via NSE's API, in parallel.
+
+        Returns {index_name: snapshot_result} where each value is the same
+        dict that snapshot_constituents() returns for a single index.
+        Indices that fail (network error etc.) are included with an
+        "error" key instead.
+        """
+        import concurrent.futures
+
+        results: dict[str, dict] = {}
+
+        def _snap(idx: str):
+            try:
+                return idx, self.snapshot_constituents(idx)
+            except Exception as exc:
+                return idx, {"index": idx, "error": str(exc)}
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {pool.submit(_snap, idx): idx for idx in INDICES_WITH_CONSTITUENTS}
+            for fut in concurrent.futures.as_completed(futures):
+                idx, result = fut.result()
+                results[idx] = result
+                changed = bool(result.get("added") or result.get("removed"))
+                status  = "CHANGED" if changed else ("FIRST" if result.get("first_run") else "ok")
+                err     = result.get("error", "")
+                print(f"  [{status:7s}] {idx}" + (f" — {err}" if err else ""))
+
+        return results
 
     def constituent_changes(self, index: str) -> dict:
         """
