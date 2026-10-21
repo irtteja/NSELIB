@@ -635,63 +635,73 @@ class Guardian:
             except Exception as exc:
                 print(f"[Guardian] ✗ {method_name} failed: {exc} — asking Claude to fix…")
 
-                # ask Claude to fix the method
-                target  = base / f"{module}.py"
-                current = target.read_text() if target.exists() else ""
-                fix_prompt = (
-                    f"The nselib method `{method_name}` for NSE path `{path}` "
-                    f"failed when called with no arguments. Error: {exc}\n\n"
-                    f"Current implementation:\n{d.get('method_code', '')}\n\n"
-                    f"Fix the method so it works with sensible defaults for any "
-                    f"required parameters. Use guarded_get pattern. "
-                    f"Reply with ONLY the corrected method code (no JSON wrapper)."
-                )
-                fixed_code = self._brain.ask(fix_prompt).strip()
-                # strip markdown fences if present
-                fixed_code = re.sub(r"^```python\s*|^```\s*|```$", "",
-                                    fixed_code, flags=re.MULTILINE).strip()
+                target      = base / f"{module}.py"
+                last_error  = str(exc)
+                last_code   = d.get("method_code", "")
+                status      = "failed"
+                detail      = f"unfixable: {last_error}"
+                max_attempts = 3
 
-                if fixed_code and target.exists():
-                    # replace old method body in file
-                    old_code = d.get("method_code", "").strip()
-                    old_indented = "\n    ".join(old_code.splitlines())
+                for attempt in range(max_attempts):
+                    attempt_label = f"attempt {attempt + 1}/{max_attempts}"
+                    fix_prompt = (
+                        f"The nselib method `{method_name}` for NSE path `{path}` "
+                        f"failed when called with no arguments ({attempt_label}).\n"
+                        f"Error: {last_error}\n\n"
+                        f"Current (broken) implementation:\n{last_code}\n\n"
+                        f"Fix the method so it works with sensible defaults for any "
+                        f"required parameters. Use guarded_get pattern. "
+                        f"Reply with ONLY the corrected method code (no JSON wrapper)."
+                    )
+                    fixed_code = self._brain.ask(fix_prompt).strip()
+                    fixed_code = re.sub(r"^```python\s*|^```\s*|```$", "",
+                                        fixed_code, flags=re.MULTILINE).strip()
+
+                    if not fixed_code or not target.exists():
+                        detail = f"unfixable: no fix generated ({last_error})"
+                        break
+
+                    old_indented = "\n    ".join(last_code.strip().splitlines())
                     new_indented = "\n    ".join(fixed_code.splitlines())
-                    updated = current.replace(f"    {old_indented}", f"    {new_indented}", 1)
-                    if updated != current:
-                        target.write_text(updated)
-                        d["method_code"] = fixed_code  # update in-memory record
-                        print(f"[Guardian] Fixed and rewrote {method_name} — re-testing…")
+                    current      = target.read_text()
+                    updated      = current.replace(f"    {old_indented}", f"    {new_indented}", 1)
+                    if updated == current:
+                        detail = f"fix generated but could not splice into file ({last_error})"
+                        break
 
-                        # Re-test the fixed version
-                        try:
-                            if mod_path in _sys.modules:
-                                importlib.reload(_sys.modules[mod_path])
-                            method = getattr(nse, method_name, None)
-                            resp2  = method() if method else None
-                            if resp2 and not self._is_broken(resp2):
-                                detail = "fixed and verified"
-                                status = "fixed"
-                                print(f"[Guardian] ✓ {method_name} (fixed)")
-                            else:
-                                raise ValueError("still empty after fix")
-                        except Exception as retest_exc:
-                            # Fix didn't work — remove the method from the file
-                            print(f"[Guardian] ✗ {method_name} still failing after fix "
-                                  f"({retest_exc}) — removing from file")
-                            file_text = target.read_text()
-                            remove_indented = "\n    ".join(fixed_code.splitlines())
-                            file_text = file_text.replace(
-                                f"\n\n    {remove_indented}\n", "", 1
-                            )
-                            target.write_text(file_text)
-                            detail = f"removed: could not fix — {retest_exc}"
-                            status = "removed"
-                    else:
-                        detail = f"fix generated but could not splice into file: {exc}"
-                        status = "failed"
+                    target.write_text(updated)
+                    d["method_code"] = fixed_code
+                    print(f"[Guardian] Spliced fix for {method_name} ({attempt_label}) — re-testing…")
+
+                    try:
+                        if mod_path in _sys.modules:
+                            importlib.reload(_sys.modules[mod_path])
+                        method2 = getattr(nse, method_name, None)
+                        resp2   = method2() if method2 else None
+                        if resp2 and not self._is_broken(resp2):
+                            detail = f"fixed and verified ({attempt_label})"
+                            status = "fixed"
+                            print(f"[Guardian] ✓ {method_name} (fixed on {attempt_label})")
+                            break
+                        else:
+                            last_error = "empty response after fix"
+                            last_code  = fixed_code
+                            print(f"[Guardian] ✗ {method_name} still empty ({attempt_label}), retrying…")
+                    except Exception as retest_exc:
+                        last_error = str(retest_exc)
+                        last_code  = fixed_code
+                        print(f"[Guardian] ✗ {method_name} still failing ({attempt_label}): "
+                              f"{retest_exc} — retrying…")
                 else:
-                    detail = f"unfixable: {exc}"
-                    status = "failed"
+                    # all attempts exhausted — remove the method from the file
+                    print(f"[Guardian] ✗ {method_name} could not be fixed after {max_attempts} "
+                          f"attempts — removing from file")
+                    file_text    = target.read_text()
+                    bad_indented = "\n    ".join(last_code.strip().splitlines())
+                    file_text    = file_text.replace(f"\n\n    {bad_indented}\n", "", 1)
+                    target.write_text(file_text)
+                    detail = f"removed: {max_attempts} fix attempts failed — {last_error}"
+                    status = "removed"
 
                 results.append({"method": method_name, "status": status, "detail": detail})
                 self._log("verify", method=method_name, status=status,
