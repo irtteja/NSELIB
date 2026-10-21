@@ -348,34 +348,50 @@ class IndicesMixin:
         _BHAV_DIR.mkdir(parents=True, exist_ok=True)
         out_file = _BHAV_DIR / "constituents_1y.csv"
 
-        # load existing rows; find last date already saved
+        # load existing rows; find last date and which symbols are already present
         existing: list[dict] = []
         last_saved: str = ""
+        existing_symbols: set[str] = set()
         if out_file.exists():
             with open(out_file, newline="") as f:
                 existing = list(csv.DictReader(f))
             if existing:
                 last_saved = max(r["TradDt"] for r in existing)
+                existing_symbols = {r["TckrSymb"] for r in existing}
 
-        # date range: only days after what we already have
-        to_date   = date.today() - timedelta(days=1)
+        to_date = date.today() - timedelta(days=1)
+        cutoff  = (date.today() - timedelta(days=365)).isoformat()
+
+        # stocks new to the universe since the last CSV update need a full-year backfill
+        new_symbols = symbols - existing_symbols
+
+        # incremental range for all known stocks
         from_date = (
             date.fromisoformat(last_saved) + timedelta(days=1)
             if last_saved
             else to_date - timedelta(days=365)
         )
 
-        days = _trading_days(from_date, to_date)
-        if not days:
+        incremental_days = _trading_days(from_date, to_date)
+        backfill_days    = (
+            _trading_days(to_date - timedelta(days=365), to_date)
+            if new_symbols else []
+        )
+
+        if not incremental_days and not backfill_days:
             print("  bhav: already up to date")
             return out_file
 
-        print(f"  bhav: fetching {len(days)} day(s) "
-              f"({from_date} → {to_date}) for {len(symbols)} stocks …")
+        if incremental_days:
+            print(f"  bhav: incremental {len(incremental_days)} day(s) "
+                  f"({from_date} → {to_date}) for {len(symbols)} stocks …")
+        if new_symbols:
+            print(f"  bhav: backfilling {len(new_symbols)} new stock(s) "
+                  f"over {len(backfill_days)} day(s) …")
 
         new_rows: list[dict] = []
 
-        def _fetch_day(dt: date):
+        def _fetch_day(dt: date, filter_symbols: set[str]):
             tmp = Path(tempfile.mkdtemp())
             try:
                 csv_path = self.equity_bhavcopy(dt=dt, folder=tmp)
@@ -385,7 +401,7 @@ class IndicesMixin:
                     for row in reader:
                         sym    = row.get("TckrSymb", "").strip()
                         series = row.get("SctySrs",  "").strip()
-                        if sym in symbols and series in _EQ_SERIES:
+                        if sym in filter_symbols and series in _EQ_SERIES:
                             rows.append({c: row.get(c, "") for c in _BHAV_COLS})
                 csv_path.unlink(missing_ok=True)
                 return dt, rows, None
@@ -396,7 +412,14 @@ class IndicesMixin:
 
         ok = err = 0
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
-            futures = {pool.submit(_fetch_day, d): d for d in days}
+            futures = {}
+            for d in incremental_days:
+                futures[pool.submit(_fetch_day, d, symbols)] = d
+            # backfill days that aren't already covered by incremental
+            incremental_set = set(incremental_days)
+            for d in backfill_days:
+                if d not in incremental_set:
+                    futures[pool.submit(_fetch_day, d, new_symbols)] = d
             for fut in concurrent.futures.as_completed(futures):
                 dt, rows, exc = fut.result()
                 if exc:
@@ -411,7 +434,6 @@ class IndicesMixin:
             return out_file
 
         # merge, deduplicate, prune >365 days, sort
-        cutoff = (date.today() - timedelta(days=365)).isoformat()
         all_rows = [r for r in existing if r.get("TradDt", "") >= cutoff]
         all_rows.extend(new_rows)
 
