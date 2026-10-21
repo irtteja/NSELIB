@@ -216,3 +216,9 @@ class CorporateMixin:
         if to_date:
             params['to_date'] = to_date
         return (self._guardian.guarded_get if self._guardian else self._session.get)('corporate-sast-reg29', params)
+
+    def large_deals_snapshot(self):
+        """Fetch the capital market large deals snapshot (bulk, block and short selling deals)."""
+        path = "snapshot-capital-market-largedeal"
+        params = {}
+        return (self._guardian.guarded_get if self._guardian else self._session.get)(path, params)

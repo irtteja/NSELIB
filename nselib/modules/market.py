@@ -262,3 +262,15 @@ class MarketMixin:
         if params:
             query.update(params)
         return (self._guardian.guarded_get if self._guardian else self._session.get)("live-analysis-variations", query)
+
+    def pre_open_market_data(self, key='NIFTY'):
+        """Fetch pre-open market data for the given category key (e.g. NIFTY, BANKNIFTY, FO, ALL)."""
+        path = "market-data-pre-open"
+        params = {"key": key}
+        return (self._guardian.guarded_get if self._guardian else self._session.get)(path, params)
+
+    def fii_dii_trade_activity(self):
+        """Fetch FII/DII trading activity (provisional cash market buy/sell values)."""
+        path = "fiidiiTradeReact"
+        params = {}
+        return (self._guardian.guarded_get if self._guardian else self._session.get)(path, params)
