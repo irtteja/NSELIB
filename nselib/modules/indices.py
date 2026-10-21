@@ -8,7 +8,8 @@ from urllib.parse import quote
 
 from ..exceptions import NSEDataError
 
-_STORE = Path.home() / ".nselib" / "constituents"
+# Repo-relative: <repo_root>/data/constituents/
+_STORE = Path(__file__).parent.parent.parent / "data" / "constituents"
 
 # All 137 NSE indices (by indexSymbol) confirmed to return constituent stock data
 # via the marketWatchApi. Only INDIA VIX and NIFTY50 USD have no constituent data.
