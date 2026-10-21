@@ -525,6 +525,107 @@ class Guardian:
         print(f"[Guardian] Discovery thread started — checking every {interval}s.")
 
     # ------------------------------------------------------------------ #
+    #  Data pipeline health — bhavcopy + constituents                    #
+    # ------------------------------------------------------------------ #
+
+    def check_health(self) -> dict:
+        """
+        Check the health of both data pipelines.
+
+        Returns a dict with keys 'bhav' and 'constituents', each containing:
+          - status: 'ok' or 'stale'
+          - last_date / last_snapshot: most recent date found
+          - detail: human-readable explanation
+        """
+        import csv
+        from datetime import date, timedelta
+        from .modules.indices import _STORE, _BHAV_DIR
+
+        result = {}
+
+        # --- bhavcopy ---
+        out_file = _BHAV_DIR / "constituents_1y.csv"
+        expected = (date.today() - timedelta(days=1)).isoformat()
+        if not out_file.exists():
+            result["bhav"] = {"status": "stale", "last_date": None,
+                              "detail": "constituents_1y.csv not found"}
+        else:
+            with open(out_file, newline="") as f:
+                dates = [r["TradDt"] for r in csv.DictReader(f) if r.get("TradDt")]
+            last = max(dates) if dates else None
+            if last and last >= expected:
+                result["bhav"] = {"status": "ok", "last_date": last,
+                                  "detail": f"up to date ({last})"}
+            else:
+                result["bhav"] = {"status": "stale", "last_date": last,
+                                  "detail": f"last date {last}, expected >= {expected}"}
+
+        # --- constituents ---
+        import json as _json
+        comp = _STORE / "Comprehensive_latest.json"
+        if not comp.exists():
+            result["constituents"] = {"status": "stale", "last_snapshot": None,
+                                      "detail": "Comprehensive_latest.json not found"}
+        else:
+            data = _json.loads(comp.read_text())
+            snap_date = data.get("date")
+            n_idx     = data.get("total_indices", 0)
+            n_stocks  = data.get("total_stocks", 0)
+            if snap_date and n_idx >= 60:
+                result["constituents"] = {
+                    "status": "ok", "last_snapshot": snap_date,
+                    "detail": f"{n_idx} indices, {n_stocks} stocks as of {snap_date}",
+                }
+            else:
+                result["constituents"] = {
+                    "status": "stale", "last_snapshot": snap_date,
+                    "detail": f"only {n_idx} indices found (expected ≥ 60)",
+                }
+
+        for name, info in result.items():
+            icon = "✓" if info["status"] == "ok" else "✗"
+            print(f"[Guardian] {icon} {name}: {info['detail']}")
+
+        return result
+
+    def heal_data(self, nse_instance=None) -> dict:
+        """
+        Fix any stale data pipelines found by check_health().
+
+        Pass an NSE instance to reuse its session; if omitted, a fresh one
+        is created using the Guardian's own session.
+
+        Returns the health dict after healing.
+        """
+        health = self.check_health()
+
+        # import here to avoid circular imports at module load
+        from .nse import NSE as _NSE
+
+        nse = nse_instance or _NSE.__new__(_NSE)
+        if nse_instance is None:
+            nse._session = self._session
+            nse._brain   = self._brain
+
+        if health.get("bhav", {}).get("status") == "stale":
+            print("[Guardian] Healing bhavcopy…")
+            try:
+                nse.fetch_constituent_bhav_history(workers=4)
+                print("[Guardian] Bhavcopy healed.")
+            except Exception as exc:
+                print(f"[Guardian] Bhavcopy heal failed: {exc}")
+
+        if health.get("constituents", {}).get("status") == "stale":
+            print("[Guardian] Healing constituents…")
+            try:
+                nse.snapshot_all_constituents(workers=4)
+                print("[Guardian] Constituents healed.")
+            except Exception as exc:
+                print(f"[Guardian] Constituents heal failed: {exc}")
+
+        return self.check_health()
+
+    # ------------------------------------------------------------------ #
     #  Reporting                                                           #
     # ------------------------------------------------------------------ #
 
@@ -535,6 +636,7 @@ class Guardian:
             "patches":     self._patches,
             "discoveries": self._discoveries,
             "schema":      {p: sorted(k) for p, k in self._schema.items()},
+            "data_health": self.check_health(),
         }
 
     # ------------------------------------------------------------------ #
