@@ -1,8 +1,18 @@
+from __future__ import annotations
+
+import json
 from datetime import date, timedelta
+from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
 from ..exceptions import NSEDataError
+
+_STORE = Path.home() / ".nselib" / "constituents"
+
+
+def _index_key(index: str) -> str:
+    return index.upper().replace(" ", "_").replace("&", "AND")
 
 
 def _fmt(d: date) -> str:
@@ -54,6 +64,103 @@ class IndicesMixin:
         resp = self._session.get_raw(url)
         data = resp.json()
         return data.get("data", {}).get("data", [])
+
+    # ------------------------------------------------------------------ #
+    #  Constituent tracking                                               #
+    # ------------------------------------------------------------------ #
+
+    def snapshot_constituents(self, index: str) -> dict:
+        """
+        Fetch live constituents, save a dated snapshot, and return a diff
+        vs the previous snapshot.
+
+        Snapshots are stored in ~/.nselib/constituents/.
+        The diff shows which symbols were added or removed since the last
+        snapshot — empty lists mean no change.
+
+        Returns:
+            {
+                "index":    "NIFTY 50",
+                "date":     "2026-10-21",
+                "symbols":  ["RELIANCE", "TCS", ...],   # current full list
+                "added":    [...],                        # new since last run
+                "removed":  [...],                        # gone since last run
+                "first_run": True/False,
+            }
+        """
+        key      = _index_key(index)
+        today    = date.today().isoformat()
+        _STORE.mkdir(parents=True, exist_ok=True)
+
+        history_file  = _STORE / f"{key}_history.json"
+        snapshot_file = _STORE / f"{key}_latest.json"
+
+        # fetch live constituents (skip first entry — that's the index itself)
+        raw      = self.index_constituents(index)
+        symbols  = sorted(
+            r["symbol"] for r in raw
+            if r.get("symbol") and r.get("symbol") != index
+        )
+
+        # load previous snapshot if it exists
+        prev_symbols: list[str] = []
+        first_run = not snapshot_file.exists()
+        if not first_run:
+            prev_symbols = json.loads(snapshot_file.read_text()).get("symbols", [])
+
+        added   = sorted(set(symbols) - set(prev_symbols))
+        removed = sorted(set(prev_symbols) - set(symbols))
+
+        # save new snapshot
+        snapshot = {"index": index, "date": today, "symbols": symbols}
+        snapshot_file.write_text(json.dumps(snapshot, indent=2))
+
+        # append to history only when something changed (or first run)
+        if first_run or added or removed:
+            history: list[dict] = []
+            if history_file.exists():
+                history = json.loads(history_file.read_text())
+            history.append({
+                "date":    today,
+                "added":   added,
+                "removed": removed,
+                "total":   len(symbols),
+            })
+            history_file.write_text(json.dumps(history, indent=2))
+
+        return {
+            "index":     index,
+            "date":      today,
+            "symbols":   symbols,
+            "added":     added,
+            "removed":   removed,
+            "first_run": first_run,
+        }
+
+    def constituent_history(self, index: str) -> list[dict]:
+        """
+        Return the full changelog of constituent additions and removals
+        for an index, oldest first.
+
+        Each entry: {"date", "added": [...], "removed": [...], "total": N}
+
+        Returns [] if snapshot_constituents() has never been called for
+        this index.
+        """
+        history_file = _STORE / f"{_index_key(index)}_history.json"
+        if not history_file.exists():
+            return []
+        return json.loads(history_file.read_text())
+
+    def constituent_changes(self, index: str) -> dict:
+        """
+        Return only the most recent change record for an index.
+        Useful for a quick check: did anything change since last run?
+
+        Returns {} if no history exists yet.
+        """
+        history = self.constituent_history(index)
+        return history[-1] if history else {}
 
     def fetch_index_names(self) -> dict[str, str]:
         """Return {short_name: full_name} mapping for all indices."""
