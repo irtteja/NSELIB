@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import json
 from datetime import date, timedelta
 from pathlib import Path
@@ -8,8 +9,18 @@ from urllib.parse import quote
 
 from ..exceptions import NSEDataError
 
-# Repo-relative: <repo_root>/data/constituents/
-_STORE = Path(__file__).parent.parent.parent / "data" / "constituents"
+# Repo-relative store paths
+_STORE    = Path(__file__).parent.parent.parent / "data" / "constituents"
+_BHAV_DIR = Path(__file__).parent.parent.parent / "data" / "bhav"
+
+# Columns to keep from the bhavcopy CSV (new NSE format)
+_BHAV_COLS = [
+    "TradDt", "TckrSymb", "SctySrs",
+    "OpnPric", "HghPric", "LwPric", "ClsPric", "PrvsClsgPric",
+    "TtlTradgVol", "TtlTrfVal", "TtlNbOfTxsExctd", "ISIN",
+]
+# Only equity cash-market series
+_EQ_SERIES = {"EQ", "BE", "BZ", "SM", "ST"}
 
 # All 137 NSE indices (by indexSymbol) confirmed to return constituent stock data
 # via the marketWatchApi. Only INDIA VIX and NIFTY50 USD have no constituent data.
@@ -261,6 +272,7 @@ class IndicesMixin:
                 print(f"  [{status:7s}] {sym}" + (f" — {err}" if err else ""))
 
         self.build_comprehensive_latest()
+        self.fetch_constituent_bhav_history()
         return results
 
     def build_comprehensive_latest(self) -> dict:
@@ -300,6 +312,126 @@ class IndicesMixin:
         _STORE.mkdir(parents=True, exist_ok=True)
         (_STORE / "Comprehensive_latest.json").write_text(json.dumps(out, indent=2))
         return out
+
+    def fetch_constituent_bhav_history(self, workers: int = 4) -> Path:
+        """
+        Build/update a 1-year daily bhavcopy for every stock in
+        Comprehensive_latest.json.
+
+        - First run: downloads ~250 trading days of bhavcopy
+        - Subsequent runs: downloads only days missing since the last update
+        - Rows older than 365 days are pruned on every write
+
+        Output: data/bhav/constituents_1y.csv
+        Columns: TradDt, TckrSymb, SctySrs, OpnPric, HghPric, LwPric,
+                 ClsPric, PrvsClsgPric, TtlTradgVol, TtlTrfVal,
+                 TtlNbOfTxsExctd, ISIN
+
+        Returns the path to the CSV.
+        """
+        import concurrent.futures
+        import tempfile
+        from .downloads import _trading_days
+
+        comp_file = _STORE / "Comprehensive_latest.json"
+        if not comp_file.exists():
+            raise NSEDataError(
+                "Comprehensive_latest.json not found. "
+                "Run build_comprehensive_latest() first."
+            )
+
+        symbols: set[str] = set(
+            json.loads(comp_file.read_text()).get("stocks", {}).keys()
+        )
+
+        _BHAV_DIR.mkdir(parents=True, exist_ok=True)
+        out_file = _BHAV_DIR / "constituents_1y.csv"
+
+        # load existing rows; find last date already saved
+        existing: list[dict] = []
+        last_saved: str = ""
+        if out_file.exists():
+            with open(out_file, newline="") as f:
+                existing = list(csv.DictReader(f))
+            if existing:
+                last_saved = max(r["TradDt"] for r in existing)
+
+        # date range: only days after what we already have
+        to_date   = date.today() - timedelta(days=1)
+        from_date = (
+            date.fromisoformat(last_saved) + timedelta(days=1)
+            if last_saved
+            else to_date - timedelta(days=365)
+        )
+
+        days = _trading_days(from_date, to_date)
+        if not days:
+            print("  bhav: already up to date")
+            return out_file
+
+        print(f"  bhav: fetching {len(days)} day(s) "
+              f"({from_date} → {to_date}) for {len(symbols)} stocks …")
+
+        new_rows: list[dict] = []
+
+        def _fetch_day(dt: date):
+            tmp = Path(tempfile.mkdtemp())
+            try:
+                csv_path = self.equity_bhavcopy(dt=dt, folder=tmp)
+                rows = []
+                with open(csv_path, newline="", encoding="utf-8-sig") as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        sym    = row.get("TckrSymb", "").strip()
+                        series = row.get("SctySrs",  "").strip()
+                        if sym in symbols and series in _EQ_SERIES:
+                            rows.append({c: row.get(c, "") for c in _BHAV_COLS})
+                csv_path.unlink(missing_ok=True)
+                return dt, rows, None
+            except Exception as exc:
+                return dt, [], exc
+            finally:
+                import shutil; shutil.rmtree(tmp, ignore_errors=True)
+
+        ok = err = 0
+        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {pool.submit(_fetch_day, d): d for d in days}
+            for fut in concurrent.futures.as_completed(futures):
+                dt, rows, exc = fut.result()
+                if exc:
+                    err += 1
+                else:
+                    new_rows.extend(rows)
+                    ok += 1
+
+        print(f"  bhav: {ok} days ok, {err} failed (holidays/closures)")
+
+        if not new_rows and not existing:
+            return out_file
+
+        # merge, deduplicate, prune >365 days, sort
+        cutoff = (date.today() - timedelta(days=365)).isoformat()
+        all_rows = [r for r in existing if r.get("TradDt", "") >= cutoff]
+        all_rows.extend(new_rows)
+
+        # deduplicate by (TradDt, TckrSymb)
+        seen: set[tuple] = set()
+        deduped: list[dict] = []
+        for r in all_rows:
+            key = (r["TradDt"], r["TckrSymb"])
+            if key not in seen:
+                seen.add(key)
+                deduped.append(r)
+
+        deduped.sort(key=lambda r: (r["TradDt"], r["TckrSymb"]))
+
+        with open(out_file, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=_BHAV_COLS)
+            writer.writeheader()
+            writer.writerows(deduped)
+
+        print(f"  bhav: {len(deduped):,} rows saved → {out_file}")
+        return out_file
 
     def constituent_changes(self, index: str) -> dict:
         """
