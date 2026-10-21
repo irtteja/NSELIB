@@ -260,7 +260,46 @@ class IndicesMixin:
                 err     = result.get("error", "")
                 print(f"  [{status:7s}] {sym}" + (f" — {err}" if err else ""))
 
+        self.build_comprehensive_latest()
         return results
+
+    def build_comprehensive_latest(self) -> dict:
+        """
+        Aggregate all per-index _latest.json files into a single
+        Comprehensive_latest.json, deduplicating by stock symbol.
+
+        Each stock entry lists every index it belongs to, sorted alphabetically.
+        The file is written to data/constituents/Comprehensive_latest.json.
+
+        Returns the aggregate dict.
+        """
+        stock_indices: dict[str, list[str]] = {}
+
+        for latest_file in sorted(_STORE.glob("*_latest.json")):
+            try:
+                snap = json.loads(latest_file.read_text())
+            except Exception:
+                continue
+            index_name = snap.get("index", latest_file.stem.replace("_latest", ""))
+            for symbol in snap.get("symbols", []):
+                stock_indices.setdefault(symbol, []).append(index_name)
+
+        # sort each stock's index list and the stocks themselves
+        stocks = {
+            sym: sorted(indices)
+            for sym, indices in sorted(stock_indices.items())
+        }
+
+        out = {
+            "date":          date.today().isoformat(),
+            "total_indices": len({idx for idxs in stocks.values() for idx in idxs}),
+            "total_stocks":  len(stocks),
+            "stocks":        stocks,
+        }
+
+        _STORE.mkdir(parents=True, exist_ok=True)
+        (_STORE / "Comprehensive_latest.json").write_text(json.dumps(out, indent=2))
+        return out
 
     def constituent_changes(self, index: str) -> dict:
         """
