@@ -51,6 +51,13 @@ _CONSTITUENT_CSV: dict[str, str] = {
     "NIFTY CONSUMER DURABLES":          "ind_niftyconsumerdurableslist.csv",
     "NIFTY INDIA MANUFACTURING":        "ind_niftyindiamanufacturing_list.csv",
     "NIFTY INDIA DEFENCE":              "ind_niftyindiadefence_list.csv",
+    "NIFTY MIDSMALL HEALTHCARE":        "ind_niftymidsmallhealthcare_list.csv",
+    "NIFTY INDIA DIGITAL":              "ind_niftyindiadigital_list.csv",
+    "NIFTY INDIA TOURISM":              "ind_niftyindiatourism_list.csv",
+    "NIFTY TRANSPORTATION & LOGISTICS": "ind_niftytransportationandlogistics_list.csv",
+    "NIFTY MIDCAP150 QUALITY 50":       "ind_niftymidcap150quality50list.csv",
+    "NIFTY CORE HOUSING":               "ind_niftycorehousing_list.csv",
+    "NIFTY MOBILITY":                   "ind_niftymobility_list.csv",
 }
 
 NSE_ARCHIVE = "https://nsearchives.nseindia.com"
