@@ -269,6 +269,19 @@ class MarketMixin:
         params = {"key": key}
         return (self._guardian.guarded_get if self._guardian else self._session.get)(path, params)
 
+    def market_turnover(self) -> list[dict]:
+        """
+        Previous day and live intraday turnover by segment.
+        Segments: Equities, Index Futures, Index Options, Stock Futures,
+                  Stock Options, Currency Futures, Currency Options,
+                  Commodity Futures, Commodity Options, Interest Rate Futures.
+        Each record: { name, yesterday: {volume, value, openInterest},
+                                 today: {volume, value, openInterest} }
+        value is in ₹ (not crores).
+        """
+        resp = self._session.get("market-turnover")
+        return resp.get("data", []) if isinstance(resp, dict) else resp
+
     def fii_dii_trade_activity(self):
         """Fetch FII/DII trading activity (provisional cash market buy/sell values)."""
         path = "fiidiiTradeReact"

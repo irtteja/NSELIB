@@ -343,6 +343,31 @@ class CorporateMixin:
             params['to_date'] = to_date
         return (self._guardian.guarded_get if self._guardian else self._session.get)('corporate-sast-reg29', params)
 
+    def credit_ratings(
+        self,
+        symbol: str | None = None,
+        isin:   str | None = None,
+    ) -> list[dict]:
+        """
+        Credit rating disclosures filed with NSE.
+        Returns all recent filings — NSE does not support server-side filtering,
+        so pass symbol or isin to filter client-side.
+
+        Each record has: Symbol, CompanyName, ISIN, NameOfCRAgency, CreditRating,
+        RatingAction, Outlook, DateofCR, CreditRatingEarlier, OutlookEarlier,
+        DateOfCREarlier, BroadcastDateTime, XbrlFileName.
+        """
+        resp = self._session.get("corporate-credit-rating")
+        data = resp if isinstance(resp, list) else resp.get("data", [])
+        if symbol:
+            sym = symbol.upper()
+            data = [r for r in data
+                    if (r.get("Symbol") or "").upper() == sym
+                    or sym in (r.get("CompanyName") or "").upper()]
+        if isin:
+            data = [r for r in data if r.get("ISIN") == isin or r.get("ISIN_ER") == isin]
+        return data
+
     def large_deals_snapshot(self):
         """Fetch the capital market large deals snapshot (bulk, block and short selling deals)."""
         path = "snapshot-capital-market-largedeal"
