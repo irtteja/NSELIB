@@ -14,7 +14,8 @@ Usage
     from nselib import NSE
     from nselib.healthcheck import HealthChecker
 
-    nse = NSE(anthropic_api_key="sk-ant-...", guard=True)
+    # Inside a Claude Code session — no API key needed; Brain uses the local claude CLI
+    nse = NSE(guard=True)
     hc  = HealthChecker(nse)
 
     report = hc.run("/path/to/nselib")           # one-shot full cycle
