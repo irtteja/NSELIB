@@ -378,24 +378,6 @@ class NSE(
             self.pre_open,
         )
 
-        b.register(
-            "fetch_historical_vix_data",
-            "Historical India VIX values.",
-            {
-                "type": "object",
-                "properties": {
-                    "from_date": {"type": "string"},
-                    "to_date":   {"type": "string"},
-                },
-                "required": [],
-            },
-            lambda from_date=None, to_date=None: (
-                self.fetch_historical_vix_data(
-                    from_date=date.fromisoformat(from_date) if from_date else None,
-                    to_date=date.fromisoformat(to_date) if to_date else None,
-                )
-            ),
-        )
 
         b.register(
             "shareholding_patterns",

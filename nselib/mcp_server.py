@@ -94,16 +94,6 @@ def fetch_historical_index_data(
     return _json(_nse.fetch_historical_index_data(index, from_date=fd, to_date=td))
 
 
-@mcp.tool()
-def fetch_historical_vix_data(
-    from_date: str | None = None,
-    to_date: str | None = None,
-) -> str:
-    """India VIX daily history. Dates as YYYY-MM-DD. Defaults to last 30 days."""
-    fd = date.fromisoformat(from_date) if from_date else None
-    td = date.fromisoformat(to_date)   if to_date   else None
-    return _json(_nse.fetch_historical_vix_data(from_date=fd, to_date=td))
-
 
 # ── Market ────────────────────────────────────────────────────────────────
 

@@ -550,33 +550,6 @@ class IndicesMixin:
         rows.sort(key=lambda r: r.get("HistoricalDate", r.get("Date", "")))
         return rows
 
-    def fetch_historical_vix_data(
-        self,
-        from_date: date | None = None,
-        to_date:   date | None = None,
-    ) -> list[dict]:
-        """
-        Daily India VIX history. Ranges >1 year are chunked.
-        Returns newest-first (matches NSE's default sort).
-        """
-        to_date   = to_date   or date.today()
-        from_date = from_date or (to_date - timedelta(days=30))
-
-        rows: list[dict] = []
-        for start, end in _chunk_dates(from_date, to_date, days=364):
-            resp = self._session.get(
-                "historicalOR/chartData",
-                params={
-                    "indexType": "INDIA VIX",
-                    "from":      _fmt(start),
-                    "to":        _fmt(end),
-                },
-            )
-            chunk = resp.get("grapthData", resp.get("data", [])) if isinstance(resp, dict) else resp
-            if isinstance(chunk, list):
-                rows.extend(chunk)
-
-        return rows
 
     def get_index_names(self):
         """List of all NSE index names grouped by category."""

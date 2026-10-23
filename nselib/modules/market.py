@@ -127,13 +127,6 @@ class MarketMixin:
         """All ETFs listed on NSE."""
         return self._session.get("etf")
 
-    def list_sme(self) -> dict:
-        """SME / Emerge stocks."""
-        return self._session.get("live-analysis-emerge-market")
-
-    def list_sgb(self) -> dict:
-        """Sovereign Gold Bonds."""
-        return self._session.get("sovereign-gold-bond")
 
     # ------------------------------------------------------------------ #
     #  Gainers / losers / breadth                                         #

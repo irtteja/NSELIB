@@ -115,18 +115,6 @@ class QuotesMixin:
         """Full quote dict including order book, trade info, and price info."""
         return self.quote(symbol, series)
 
-    def week52_high_low(self, index: str = "equities") -> list[dict]:
-        """
-        52-week high/low detail for all equities (or SME with index='sme').
-        Each record has: symbol, companyName, series, high_date, low_date,
-        prev_high, prev_low, highPrice, lowPrice, ltp, change, pChange.
-
-        Note: this endpoint may return no data outside market hours or
-        from restricted IPs — retry during live market if empty.
-        """
-        resp = self._session.get("52-week-high-low-detail",
-                                 params={"index": index})
-        return resp if isinstance(resp, list) else resp.get("data", resp)
 
     def get_equity_master(self):
         """Equity master: indices/categories mapped to their constituent equity segments."""

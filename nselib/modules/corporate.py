@@ -227,6 +227,80 @@ class CorporateMixin:
 
         return results
 
+    def integrated_filing_rss(
+        self,
+        from_date: date | None = None,
+        to_date:   date | None = None,
+        symbol:    str | None = None,
+    ) -> list[dict]:
+        """
+        Integrated Filing – Financials with broadcast timestamp.
+
+        Each record has: symbol, company, broadcast_time, filing_type,
+        consolidated, xbrl_url.
+
+        - No args → latest 20 filings from the NSE RSS feed (real-time, fastest).
+        - from_date / to_date → historical results via financial_results()
+          (supports any date range, returns broadCastDate from NSE filings).
+        - symbol → filter to one company (works with both modes).
+        """
+        import xml.etree.ElementTree as ET
+
+        _RSS = "https://nsearchives.nseindia.com/content/RSS/Integrated_Filing_Financials.xml"
+
+        if from_date is None and to_date is None:
+            # ── Live RSS feed (last 20) ──────────────────────────────────
+            try:
+                r = self._session._s.get(_RSS, timeout=10)
+                r.raise_for_status()
+                root = ET.fromstring(r.text)
+                out = []
+                for item in root.findall(".//item"):
+                    title   = item.findtext("title", "").strip()
+                    link    = item.findtext("link", "").strip()
+                    desc    = item.findtext("description", "").strip()
+                    pubdate = item.findtext("pubDate", "").strip()
+                    # desc format: "Integrated Filing- Financials|Original|"
+                    parts = [p.strip() for p in desc.split("|")]
+                    filing_type  = parts[1] if len(parts) > 1 else ""
+                    consolidated = parts[2] if len(parts) > 2 else ""
+                    sym = link.split("_")[2] if "_" in link else ""
+                    rec = {
+                        "symbol":        sym,
+                        "company":       title,
+                        "broadcast_time": pubdate,
+                        "filing_type":   filing_type,
+                        "consolidated":  consolidated,
+                        "xbrl_url":      link,
+                    }
+                    if symbol and rec["company"].lower().find(symbol.lower()) == -1:
+                        continue
+                    out.append(rec)
+                return out
+            except Exception:
+                pass  # fall through to financial_results if RSS fails
+
+        # ── Historical via financial_results() ──────────────────────────
+        raw = self.financial_results(
+            symbol=symbol,
+            from_date=from_date,
+            to_date=to_date,
+        )
+        out = []
+        for r in raw:
+            xbrl = r.get("xbrl", "") or ""
+            if not xbrl or not xbrl.startswith("http"):
+                continue
+            out.append({
+                "symbol":         r.get("symbol", ""),
+                "company":        r.get("companyName", ""),
+                "broadcast_time": r.get("broadCastDate", r.get("exchdisstime", "")),
+                "filing_type":    "Original" if r.get("oldNewFlag") == "N" else "Revised",
+                "consolidated":   r.get("consolidated", ""),
+                "xbrl_url":       xbrl,
+            })
+        return out
+
     def shareholding_patterns(
         self,
         symbol: str,

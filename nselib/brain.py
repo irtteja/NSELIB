@@ -67,19 +67,86 @@ class Brain:
         return self._ask_cli(query)
 
     def _ask_cli(self, query: str) -> str:
-        """Call the local claude CLI (available in every Claude Code session)."""
+        """Call the local claude CLI, pre-fetching live NSE data as context."""
         cli = shutil.which("claude")
         if not cli:
             raise RuntimeError(
                 "claude CLI not found. Either run inside a Claude Code session "
                 "or pass api_key= to Brain()."
             )
+
+        # Pre-fetch live NSE data and inject into the prompt.
+        # Use a plain NSE() so we don't trigger Guardian recursion.
+        context_parts: list[str] = []
+        try:
+            from .nse import NSE as _NSE  # local import to avoid circular at module load
+            _nse = _NSE()
+
+            # Detect a stock symbol in the query (first uppercase word that resolves)
+            sym: str | None = None
+            skip = {"NSE","THE","AND","FOR","GET","TOP","ALL","A","OF","IN","IS","IT","ME","MY","GIVE","TODAY"}
+            for word in query.split():
+                w = word.strip(".,?!()[]:").upper()
+                if len(w) >= 2 and w not in skip:
+                    try:
+                        eq = _nse.equity_quote(w)
+                        if eq and eq.get("close"):
+                            sym = w
+                            context_parts.append(f"Quote {sym}: {json.dumps(eq)}")
+                            break
+                    except Exception:
+                        pass
+
+            # Market-wide context
+            for iname in ["NIFTY 50", "NIFTY BANK", "NIFTY MIDCAP 100"]:
+                try:
+                    context_parts.append(f"{iname}: {json.dumps(_nse.index_quote(iname))}")
+                except Exception:
+                    pass
+            try:
+                context_parts.append(f"Advance/decline: {json.dumps(_nse.advance_decline('NIFTY 50'))}")
+            except Exception:
+                pass
+            try:
+                v = _nse.get_live_variations("gainers")
+                context_parts.append(f"Top gainers: {json.dumps(v.get('allSec', {}).get('data', [])[:5])}")
+            except Exception:
+                pass
+            try:
+                v = _nse.get_live_variations("loosers")
+                context_parts.append(f"Top losers: {json.dumps(v.get('allSec', {}).get('data', [])[:5])}")
+            except Exception:
+                pass
+            try:
+                context_parts.append(f"Market turnover: {json.dumps(_nse.market_turnover())}")
+            except Exception:
+                pass
+
+            # Per-symbol extras
+            if sym:
+                for fn, label in [
+                    (lambda: _nse.equity_meta_info(sym), "Meta"),
+                    (lambda: _nse.corporate_actions(sym)[:5], "Corp actions"),
+                    (lambda: _nse.fetch_equity_historical_data(sym, days=30), "30d history"),
+                ]:
+                    try:
+                        context_parts.append(f"{label}: {json.dumps(fn())}")
+                    except Exception:
+                        pass
+        except Exception:
+            pass  # if data fetch fails entirely, fall through to plain query
+
+        if context_parts:
+            full_prompt = "LIVE NSE DATA:\n" + "\n".join(context_parts) + "\n\nQUERY: " + query
+        else:
+            full_prompt = query
+
         result = subprocess.run(
             [cli, "-p", "--output-format", "text"],
-            input=query,
+            input=full_prompt,
             capture_output=True,
             text=True,
-            timeout=60,
+            timeout=120,
         )
         if result.returncode != 0:
             raise RuntimeError(f"claude CLI error: {result.stderr.strip()}")
