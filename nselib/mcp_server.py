@@ -1,319 +1,179 @@
 """
-nselib MCP server — exposes all NSE data methods as Claude tools.
+nselib MCP server — auto-exposes all NSE data methods as MCP tools.
 
-Run on your laptop (residential IP) and connect to any Claude session:
+New methods added to nselib are automatically available here — no manual
+wiring required. The server introspects the NSE class at startup and
+registers every public method, converting date parameters to strings
+so the JSON schema stays clean.
 
-    # Start the server
+Run on a residential IP (your laptop) to access all endpoints including
+quote, option chain and futures (cloud-blocked from datacenter IPs):
+
     python -m nselib.mcp_server
-
-    # Or via entry point (after pip install)
+    # or after pip install:
     nselib-mcp
 
-Then add to Claude Code:
+Add to Claude Code:
     claude mcp add nselib -- python -m nselib.mcp_server
-
-All NSE calls happen from your machine, bypassing cloud IP blocks.
 """
 
+import inspect
 import json
-from datetime import date, timedelta
-from typing import Any
+from datetime import date
+from inspect import Parameter, Signature
+from typing import Any, Union, get_args, get_origin, get_type_hints
 
-from mcp.server.fastmcp import FastMCP
+try:
+    from mcp.server.fastmcp import FastMCP as _MCP   # mcp < 2
+except ModuleNotFoundError:
+    from mcp.server.mcpserver import MCPServer as _MCP  # mcp >= 2
 
 from .nse import NSE
 
-mcp = FastMCP("nselib", instructions=(
-    "NSE India data server. Provides live quotes, indices, option chains, "
-    "historical data, corporate events, and market breadth for NSE-listed instruments."
-))
+mcp = _MCP(
+    "nselib",
+    instructions=(
+        "NSE India data server. Provides live quotes, indices, option chains, "
+        "historical data, corporate events, F&O analytics, and bhavcopy downloads."
+    ),
+)
 
 _nse = NSE()
 
+# Methods that require Brain/Claude or accept raw data pipelines as input
+_SKIP = {
+    "ask", "analyze", "market_summary", "screen",  # need Claude brain
+    "gainers", "losers",                            # take raw data list — wrapped below
+    "guardian", "close",
+}
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────
 
 def _json(obj: Any) -> str:
-    def default(o):
+    def _default(o):
         if isinstance(o, date):
             return o.isoformat()
         return str(o)
-    return json.dumps(obj, default=default, ensure_ascii=False)
+    return json.dumps(obj, default=_default, ensure_ascii=False)
 
 
-# ── Quotes ────────────────────────────────────────────────────────────────
-
-@mcp.tool()
-def equity_quote(symbol: str) -> str:
-    """Live OHLCV snapshot for an NSE equity. symbol e.g. RELIANCE, TCS, INFY."""
-    return _json(_nse.equity_quote(symbol))
-
-
-@mcp.tool()
-def full_quote(symbol: str, series: str = "EQ") -> str:
-    """Full NSE quote: OHLC, LTP, depth, 52w H/L, circuit limits. symbol e.g. RELIANCE."""
-    return _json(_nse.quote(symbol, series))
+def _is_date_ann(ann) -> bool:
+    if ann is date:
+        return True
+    if get_origin(ann) is Union:
+        return date in get_args(ann)
+    return False
 
 
-@mcp.tool()
-def equity_meta_info(symbol: str) -> str:
-    """Company metadata: ISIN, series, FnO/ETF flags, suspended status."""
-    return _json(_nse.equity_meta_info(symbol))
+def _str_ann(ann):
+    """Replace date with str, preserving Optional."""
+    if ann is date:
+        return str
+    if get_origin(ann) is Union:
+        args = get_args(ann)
+        if date in args:
+            return str | None if type(None) in args else str
+    return ann
 
 
-@mcp.tool()
-def lookup(query: str, segment: str = "equity") -> str:
-    """Search NSE by company name or symbol. segment: equity | derivatives | etf | all."""
-    return _json(_nse.lookup(query, segment))
+def _convert(val: Any, ann: Any) -> Any:
+    """Convert a string value to date when the original annotation requires it."""
+    if val is None or not _is_date_ann(ann):
+        return val
+    try:
+        return date.fromisoformat(str(val))
+    except (ValueError, TypeError):
+        return val
 
 
-# ── Indices ───────────────────────────────────────────────────────────────
-
-@mcp.tool()
-def list_indices() -> str:
-    """All 139 NSE indices with live value, change, P/E, P/B, advances/declines."""
-    return _json(_nse.list_indices())
-
-
-@mcp.tool()
-def index_quote(index: str) -> str:
-    """Live quote for one index. index e.g. 'NIFTY 50', 'NIFTY BANK', 'NIFTY IT'."""
-    return _json(_nse.index_quote(index))
-
-
-@mcp.tool()
-def fetch_historical_index_data(
-    index: str,
-    from_date: str | None = None,
-    to_date: str | None = None,
-) -> str:
+def _make_tool(method: Any, name: str):
     """
-    Daily OHLC + turnover for an NSE index.
-    index e.g. 'NIFTY 50'. Dates as YYYY-MM-DD. Defaults to last 30 days.
+    Build a FastMCP-compatible wrapper for an NSE method.
+    - Replaces date params with str so the JSON schema stays clean.
+    - Returns None for methods whose first param takes a raw data structure
+      (those aren't useful as standalone MCP tools).
     """
-    fd = date.fromisoformat(from_date) if from_date else None
-    td = date.fromisoformat(to_date)   if to_date   else None
-    return _json(_nse.fetch_historical_index_data(index, from_date=fd, to_date=td))
+    try:
+        hints = get_type_hints(method)
+    except Exception:
+        hints = {}
+
+    sig    = inspect.signature(method)
+    params = [p for p in sig.parameters.values() if p.name != "self"]
+
+    # Skip pipeline methods whose first param is a raw list/dict
+    if params:
+        first_ann = hints.get(params[0].name)
+        if get_origin(first_ann) in (list, dict) or first_ann in (list, dict):
+            return None
+
+    new_params: list[Parameter] = []
+    conv_map:   dict[str, Any]  = {}
+    for p in params:
+        ann   = hints.get(p.name, Parameter.empty)
+        new_p = p.replace(
+            annotation=_str_ann(ann) if ann is not Parameter.empty else Parameter.empty
+        )
+        new_params.append(new_p)
+        conv_map[p.name] = ann
+
+    new_sig = Signature(new_params, return_annotation=str)
+    doc     = inspect.getdoc(method) or f"NSE {name}"
+
+    def wrapper(**kwargs: Any) -> str:
+        converted = {k: _convert(v, conv_map.get(k)) for k, v in kwargs.items()}
+        return _json(method(**converted))
+
+    wrapper.__name__      = name
+    wrapper.__qualname__  = name
+    wrapper.__doc__       = doc
+    wrapper.__signature__ = new_sig
+    wrapper.__annotations__ = {
+        p.name: p.annotation
+        for p in new_params
+        if p.annotation is not Parameter.empty
+    }
+    wrapper.__annotations__["return"] = str
+    return wrapper
 
 
+# ── Auto-register all public NSE methods ─────────────────────────────────
 
-# ── Market ────────────────────────────────────────────────────────────────
+_registered: list[str] = []
 
-@mcp.tool()
-def market_status() -> str:
-    """Open/closed status for all NSE segments (CM, FO, CD, etc.)."""
-    return _json(_nse.status())
+for _name in sorted(dir(_nse)):
+    if _name.startswith("_") or _name in _SKIP:
+        continue
+    _method = getattr(_nse, _name, None)
+    if not callable(_method):
+        continue
+    _wrapper = _make_tool(_method, _name)
+    if _wrapper is None:
+        continue
+    mcp.tool()(_wrapper)
+    _registered.append(_name)
 
 
-@mcp.tool()
-def holidays(type: str = "trading") -> str:
-    """Exchange holiday calendar. type: trading | clearing."""
-    return _json(_nse.holidays(type))
-
-
-@mcp.tool()
-def list_equity_stocks_by_index(index: str = "NIFTY 50") -> str:
-    """All stocks in an index with live price and change. index e.g. 'NIFTY 50'."""
-    return _json(_nse.list_equity_stocks_by_index(index))
-
+# ── Special wrappers for methods that need pre-fetched data ──────────────
 
 @mcp.tool()
 def top_gainers(index: str = "NIFTY 50", count: int = 10) -> str:
-    """Top gainers in an index. Returns top `count` stocks sorted by % change."""
-    data = _nse.list_equity_stocks_by_index(index)
-    return _json(_nse.gainers(data, count))
+    """Top N gainers in an index sorted by % change."""
+    return _json(_nse.gainers(_nse.list_equity_stocks_by_index(index), count))
 
 
 @mcp.tool()
 def top_losers(index: str = "NIFTY 50", count: int = 10) -> str:
-    """Top losers in an index. Returns top `count` stocks sorted by % loss."""
-    data = _nse.list_equity_stocks_by_index(index)
-    return _json(_nse.losers(data, count))
-
-
-@mcp.tool()
-def advance_decline(index: str = "NIFTY 50") -> str:
-    """Advance/decline/unchanged count and ratio for an index."""
-    return _json(_nse.advance_decline(index))
-
-
-@mcp.tool()
-def pre_open(category: str = "ALL") -> str:
-    """Pre-open IEP and order data (09:00–09:15 IST). category: NIFTY 50 | NIFTY BANK | ALL."""
-    return _json(_nse.pre_open(category))
-
-
-@mcp.tool()
-def live_volume_gainers() -> str:
-    """Stocks with unusual volume surge relative to their average."""
-    return _json(_nse.live_volume_gainers())
-
-
-@mcp.tool()
-def block_deals() -> str:
-    """Today's block deals."""
-    return _json(_nse.block_deals())
-
-
-@mcp.tool()
-def bulk_deals(
-    from_date: str | None = None,
-    to_date: str | None = None,
-    option_type: str = "bulk_deals",
-) -> str:
-    """
-    Bulk/block/short-selling deals over a date range.
-    option_type: bulk_deals | block_deals | short_selling. Dates as YYYY-MM-DD.
-    """
-    fd = date.fromisoformat(from_date) if from_date else None
-    td = date.fromisoformat(to_date)   if to_date   else None
-    return _json(_nse.bulk_deals(option_type=option_type, from_date=fd, to_date=td))
-
-
-# ── History ───────────────────────────────────────────────────────────────
-
-@mcp.tool()
-def fetch_equity_historical_data(
-    symbol: str,
-    from_date: str | None = None,
-    to_date: str | None = None,
-    days: int | None = None,
-    series: str = "EQ",
-) -> str:
-    """
-    Historical daily OHLCV for an equity.
-    symbol e.g. RELIANCE. Dates as YYYY-MM-DD. Use days=30 for last N days.
-    """
-    fd = date.fromisoformat(from_date) if from_date else None
-    td = date.fromisoformat(to_date)   if to_date   else None
-    return _json(_nse.fetch_equity_historical_data(symbol, from_date=fd, to_date=td, days=days, series=series))
-
-
-@mcp.tool()
-def fetch_historical_fno_data(
-    symbol: str,
-    from_date: str | None = None,
-    to_date: str | None = None,
-    instrument: str = "FUTIDX",
-    expiry_date: str | None = None,
-    strike_price: str = "-",
-    option_type: str = "CE",
-) -> str:
-    """
-    Historical F&O derivatives data.
-    symbol e.g. NIFTY. instrument: FUTIDX | FUTSTK | OPTIDX | OPTSTK.
-    """
-    fd = date.fromisoformat(from_date)    if from_date    else None
-    td = date.fromisoformat(to_date)      if to_date      else None
-    ed = date.fromisoformat(expiry_date)  if expiry_date  else None
-    return _json(_nse.fetch_historical_fno_data(
-        symbol, from_date=fd, to_date=td,
-        instrument_type=instrument, expiry_date=ed,
-        strike_price=strike_price, option_type=option_type,
-    ))
-
-
-# ── Corporate ─────────────────────────────────────────────────────────────
-
-@mcp.tool()
-def corporate_actions(
-    symbol: str | None = None,
-    from_date: str | None = None,
-    to_date: str | None = None,
-) -> str:
-    """Dividends, splits, bonuses, rights issues. Omit symbol for all upcoming."""
-    fd = date.fromisoformat(from_date) if from_date else None
-    td = date.fromisoformat(to_date)   if to_date   else None
-    return _json(_nse.corporate_actions(symbol=symbol, from_date=fd, to_date=td))
-
-
-@mcp.tool()
-def announcements(
-    symbol: str | None = None,
-    from_date: str | None = None,
-    to_date: str | None = None,
-) -> str:
-    """Exchange announcements and disclosures. Omit symbol for all."""
-    fd = date.fromisoformat(from_date) if from_date else None
-    td = date.fromisoformat(to_date)   if to_date   else None
-    return _json(_nse.announcements(symbol=symbol, from_date=fd, to_date=td))
-
-
-@mcp.tool()
-def board_meetings(
-    symbol: str | None = None,
-    from_date: str | None = None,
-    to_date: str | None = None,
-) -> str:
-    """Scheduled and past board meetings with agenda."""
-    fd = date.fromisoformat(from_date) if from_date else None
-    td = date.fromisoformat(to_date)   if to_date   else None
-    return _json(_nse.board_meetings(symbol=symbol, from_date=fd, to_date=td))
-
-
-@mcp.tool()
-def financial_results(
-    symbol: str | None = None,
-    period: str = "Quarterly",
-) -> str:
-    """Quarterly/annual results filings. period: Quarterly | Annual | Six Month."""
-    return _json(_nse.financial_results(symbol=symbol, period=period))
-
-
-@mcp.tool()
-def shareholding_patterns(symbol: str) -> str:
-    """Quarterly shareholding pattern: promoter/FII/DII/public for a symbol."""
-    return _json(_nse.shareholding_patterns(symbol))
-
-
-@mcp.tool()
-def annual_reports(symbol: str) -> str:
-    """List of annual report PDFs for a company."""
-    return _json(_nse.annual_reports(symbol))
-
-
-@mcp.tool()
-def insider_trading(
-    symbol: str | None = None,
-    from_date: str | None = None,
-    to_date: str | None = None,
-) -> str:
-    """SEBI insider trading (SAST) disclosures."""
-    fd = date.fromisoformat(from_date) if from_date else None
-    td = date.fromisoformat(to_date)   if to_date   else None
-    return _json(_nse.insider_trading(symbol=symbol, from_date=fd, to_date=td))
-
-
-# ── F&O ───────────────────────────────────────────────────────────────────
-
-@mcp.tool()
-def option_chain(symbol: str) -> str:
-    """Full option chain. Use NIFTY/BANKNIFTY for indices or any F&O equity symbol."""
-    return _json(_nse.option_chain(symbol))
-
-
-@mcp.tool()
-def compile_option_chain(symbol: str, expiry: str | None = None) -> str:
-    """
-    Flattened option chain: strike rows with CE/PE data side-by-side.
-    expiry as DD-Mon-YYYY e.g. '27-Nov-2025'. Defaults to nearest expiry.
-    """
-    return _json(_nse.compile_option_chain(symbol, expiry))
-
-
-@mcp.tool()
-def max_pain(symbol: str, expiry: str | None = None) -> str:
-    """Max pain strike for an options expiry."""
-    return _json(_nse.max_pain(symbol, expiry))
-
-
-@mcp.tool()
-def futures_quote(symbol: str) -> str:
-    """Live futures quote for an index or stock."""
-    return _json(_nse.futures_quote(symbol))
+    """Top N losers in an index sorted by % loss."""
+    return _json(_nse.losers(_nse.list_equity_stocks_by_index(index), count))
 
 
 # ── Entry point ───────────────────────────────────────────────────────────
 
 def main() -> None:
+    import sys
+    print(f"[nselib-mcp] {len(_registered) + 2} tools registered: {_registered + ['top_gainers', 'top_losers']}", file=sys.stderr)
     mcp.run(transport="stdio")
 
 

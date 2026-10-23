@@ -6,6 +6,15 @@ Newest entries at top.
 
 ## 2026-10-23 (continued)
 
+### Rewrote mcp_server.py — auto-discovery, 86 tools (was 24 hardcoded)
+- Replaced 300 lines of manually-wired tool definitions with auto-discovery via `inspect`
+- `_make_tool()` introspects each NSE method: reads type hints, replaces `date`/`Optional[date]` params with `str`/`str | None` for clean JSON schema, auto-converts strings back to `date` at call time
+- Pipeline methods whose first param takes a raw `list`/`dict` are skipped automatically (`gainers`, `losers` wrapped explicitly as `top_gainers`/`top_losers`)
+- Brain methods (`ask`, `analyze`, `market_summary`, `screen`) excluded — not useful as MCP tools
+- Updated import to support both mcp < 2 (`FastMCP`) and mcp >= 2 (`MCPServer`)
+- New methods added to nselib are now automatically exposed as MCP tools — no manual wiring ever again
+- Verified: 86 tools registered at startup
+
 ### Added nseindia.in fallback to NSESession
 - Discovered `www.nseindia.in` is NSE's new parallel domain — accessible from cloud IPs
 - Probed all major endpoints: marketStatus, allIndices, index-names, holiday-master, market-turnover, gainers, corporate-announcements, corporate-board-meetings all return full data; option-chain returns 200 but empty (F&O not yet migrated); quote-equity still 403
