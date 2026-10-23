@@ -27,7 +27,7 @@ Format: `- [ ]` pending · `- [x]` done · `- [~]` blocked/deferred
 ## Corporate module (corporate.py)
 
 - [x] `financial_results(symbol, period)` — raw filing list
-- [x] `financial_results_detail(symbol, consolidated)` — XBRL parsed P&L
+- [x] `financial_results_detail(symbol, consolidated)` — XBRL parsed P&L + balance sheet + cash flow + segments + attribution + meta
 - [x] `financial_results_links(symbol, period)` — details URL + XBRL URL per filing (replaced broken `financial_results_pdfs()`)
 - [x] `corporate_actions(symbol)` — dividends, splits, bonuses
 - [x] `announcements(symbol)` — company announcements

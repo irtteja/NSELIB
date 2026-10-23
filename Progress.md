@@ -6,6 +6,18 @@ Newest entries at top.
 
 ## 2026-10-23
 
+### Expanded financial_results_detail() to full XBRL
+- Previously extracted only P&L (~15 tags, whitelist)
+- Now parses all ~120 monetary, meta, EPS and small-number tags from the XBRL
+- Added `balance_sheet` section: total assets, cash, equity, borrowings, receivables, goodwill, DTA/DTL
+- Added `cash_flow` section: operating/investing/financing totals + capex, dividends paid, acquisitions, buyback, lease payments
+- Added `segments` section: revenue, EBIT, PBT, segment name, multi/single segment flag
+- Added `attribution` section: PAT and TCI split between owners of parent and NCI
+- Added `meta` section: board meeting date, auditor name, ISIN, face value, FY dates
+- Added top-level: `oci`, `total_comprehensive_income`, `exceptional_items`
+- Backward-compatible: all existing P&L keys unchanged
+- Verified on INFY Q2 FY27: balance sheet ₹1,63,480 Cr assets, OCF ₹18,958 Cr, zero debt
+
 ### Added archive-based F&O methods (cloud-safe)
 - `fno_ban_list(trade_date)` — reads `nsearchives.nseindia.com/archives/fo/sec_ban/fo_secban_DDMMYYYY.csv`
   - Tries today → D-1…D-4 (weekends/holidays have no file)
