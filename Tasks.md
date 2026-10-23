@@ -82,6 +82,15 @@ Format: `- [ ]` pending · `- [x]` done · `- [~]` blocked/deferred
 - [x] `indices_bhavcopy(date)` — indices bhavcopy
 - [x] `bulk_equity_bhavcopy(from_date, to_date)` — multi-day download
 
+## Health-check agent (healthcheck.py)
+
+- [x] `HealthChecker` — full-cycle agent: test all methods → heal broken → discover/apply/verify → heal pipelines
+- [x] `HealthChecker.run(nselib_dir)` — one-shot full cycle, returns + writes JSON report
+- [x] `HealthChecker.watch(interval, nselib_dir)` — background daemon thread
+- [x] `HealthChecker.last_report()` — load most recent saved report
+- [ ] Expose `nse.health_check()` convenience wrapper on NSE class
+- [ ] Add `HealthChecker` to `nselib/__init__.py` exports
+
 ## Pending / future
 
 - [ ] `vix_history(from_date, to_date)` — India VIX historical data from archive

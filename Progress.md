@@ -4,6 +4,24 @@ Newest entries at top.
 
 ---
 
+## 2026-10-23 (continued)
+
+### Added HealthChecker agent (healthcheck.py)
+- New module `nselib/healthcheck.py` — full-cycle health agent for nselib
+- `_REGISTRY`: ~40 methods with default args exercising real data (INFY, NIFTY 50, etc.)
+- `_CLOUD_BLOCKED_METHODS`: set of 30+ methods known to be blocked from cloud/datacenter IPs — classified as expected, not bugs
+- **4-step cycle** via `HealthChecker.run(nselib_dir)`:
+  1. `_test_all()` — tests every registered method; classifies ok / broken / cloud_blocked / missing
+  2. `_heal_broken()` — re-runs broken methods up to 3 times via guardian; marks fixed on success
+  3. `_run_discovery()` — calls `guardian.discover()` → `guardian.apply()` → collects verify results from `g._discoveries`
+  4. `_heal_pipelines()` — calls `guardian.heal_data()` to fix stale bhavcopy/constituents pipelines
+- Report saved to `~/.nselib/health_report.json`; last 10 reports kept as JSON array
+- `HealthChecker.watch(interval, nselib_dir)` — daemon background thread, runs full cycle every `interval` seconds
+- `HealthChecker.last_report()` — load most recent saved report
+- Prints summary table: methods ok/broken/cloud-blocked/missing, healed/failed, new/verified/removed
+
+---
+
 ## 2026-10-23
 
 ### Expanded financial_results_detail() to full XBRL
