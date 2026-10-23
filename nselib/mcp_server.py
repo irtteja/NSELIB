@@ -19,6 +19,7 @@ Add to Claude Code:
 
 import inspect
 import json
+import types
 from datetime import date
 from inspect import Parameter, Signature
 from typing import Any, Union, get_args, get_origin, get_type_hints
@@ -58,22 +59,31 @@ def _json(obj: Any) -> str:
     return json.dumps(obj, default=_default, ensure_ascii=False)
 
 
+def _union_args(ann) -> tuple:
+    """Return the type args of any Union form (typing.Union or X | Y)."""
+    origin = get_origin(ann)
+    if origin is Union:
+        return get_args(ann)
+    # Python 3.10+ `X | Y` produces types.UnionType
+    if isinstance(ann, types.UnionType):
+        return ann.__args__
+    return ()
+
+
 def _is_date_ann(ann) -> bool:
     if ann is date:
         return True
-    if get_origin(ann) is Union:
-        return date in get_args(ann)
-    return False
+    args = _union_args(ann)
+    return bool(args) and date in args
 
 
 def _str_ann(ann):
     """Replace date with str, preserving Optional."""
     if ann is date:
         return str
-    if get_origin(ann) is Union:
-        args = get_args(ann)
-        if date in args:
-            return str | None if type(None) in args else str
+    args = _union_args(ann)
+    if args and date in args:
+        return str | None if type(None) in args else str
     return ann
 
 
