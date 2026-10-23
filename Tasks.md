@@ -1,0 +1,92 @@
+# nselib — Tasks
+
+Format: `- [ ]` pending · `- [x]` done · `- [~]` blocked/deferred
+
+## Core library
+
+- [x] NSESession with Akamai cookie handling and rate limiting
+- [x] Guardian — self-healing, schema adaptation, discover, apply, verify, watch
+- [x] Brain — Claude API integration for guardian
+- [x] MCP server exposing all methods as tools
+
+## F&O module (fno.py)
+
+- [x] `option_chain(symbol)` — raw option chain
+- [x] `compile_option_chain(symbol, expiry)` — flattened CE/PE per strike
+- [x] `max_pain(symbol, expiry)` — min pain strike
+- [x] `pcr(symbol, expiry)` — put-call ratio (fixed: ce_oi/pe_oi field names, expiry field)
+- [x] `fno_lots()` — lot sizes from archive
+- [x] `fetch_fno_underlying()` — all F&O eligible symbols
+- [x] `futures_quote(symbol)` — all-expiry futures data
+- [x] `fno_ban_list(trade_date)` — cloud-safe archive method
+- [x] `participant_oi(trade_date)` — FII/DII/Client/Pro OI, cloud-safe
+- [x] `participant_volume(trade_date)` — FII/DII/Client/Pro volume, cloud-safe
+- [x] `get_oi_spurts_underlyings()` / `get_oi_spurts_contracts()` — OI spurts
+- [x] `get_derivatives_equity_snapshot(index)` — equity derivatives snapshot
+
+## Corporate module (corporate.py)
+
+- [x] `financial_results(symbol, period)` — raw filing list
+- [x] `financial_results_detail(symbol, consolidated)` — XBRL parsed P&L
+- [x] `financial_results_links(symbol, period)` — details URL + XBRL URL per filing (replaced broken `financial_results_pdfs()`)
+- [x] `corporate_actions(symbol)` — dividends, splits, bonuses
+- [x] `announcements(symbol)` — company announcements
+- [x] `board_meetings(symbol)` — board meeting dates
+- [x] `shareholding_patterns(symbol)` — promoter/FII/DII/public
+- [x] `annual_reports(symbol)` — annual report links
+- [x] `insider_trading(symbol)` — SAST/insider filings
+- [x] `event_calendar()` — market-wide event calendar
+- [x] `credit_ratings(symbol)` — credit rating history
+- [x] `large_deals_snapshot()` — block/bulk deal snapshot
+
+## Quotes module (quotes.py)
+
+- [x] `quote(symbol, series)` — live equity quote
+- [x] `equity_quote(symbol)` — alias
+- [x] `equity_meta_info(symbol)` — company metadata
+- [x] `lookup(query, segment)` — symbol search
+- [x] `get_detailed_scrip_data(symbol)` — detailed scrip info
+- [x] `get_equity_master()` — full equity master list
+
+## History module (history.py)
+
+- [x] `fetch_equity_historical_data(symbol, from_date, to_date)` — OHLCV bhavcopy
+- [x] `fetch_historical_fno_data(symbol, from_date, to_date)` — F&O historical
+
+## Indices module (indices.py)
+
+- [x] `list_indices()` — all NSE indices
+- [x] `index_quote(index)` — live index quote
+- [x] `index_constituents(index)` — index stocks with weights
+- [x] `snapshot_constituents(index)` — snapshot with live prices
+- [x] `fetch_historical_index_data(index, from_date, to_date)` — index OHLCV
+- [x] `constituent_changes(index)` — index inclusion/exclusion history
+- [x] `build_comprehensive_latest()` — full snapshot all indices
+
+## Market module (market.py)
+
+- [x] `status()` — market open/close status
+- [x] `holidays(type)` — trading/clearing holidays
+- [x] `gainers(data, count)` / `losers(data, count)` — top movers
+- [x] `advance_decline(index)` — A/D ratio
+- [x] `pre_open(category)` — pre-open session data
+- [x] `block_deals()` / `bulk_deals()` — deal data
+- [x] `market_turnover()` — segment-wise turnover
+- [x] `fii_dii_trade_activity()` — FII/DII daily trade stats
+
+## Downloads module (downloads.py)
+
+- [x] `equity_bhavcopy(date)` — equity bhavcopy CSV
+- [x] `delivery_bhavcopy(date)` — delivery data CSV
+- [x] `fno_bhavcopy(date)` — F&O bhavcopy
+- [x] `indices_bhavcopy(date)` — indices bhavcopy
+- [x] `bulk_equity_bhavcopy(from_date, to_date)` — multi-day download
+
+## Pending / future
+
+- [ ] `vix_history(from_date, to_date)` — India VIX historical data from archive
+- [ ] `fii_dii_historical(from_date, to_date)` — FII/DII historical from archive
+- [ ] `circuit_breaker_history()` — stocks hitting upper/lower circuit
+- [ ] `options_oi_history(symbol, expiry)` — EOD OI per strike over time
+- [ ] Test suite — pytest covering all archive-based methods with known past dates
+- [ ] CI — run tests on push, alert if >10% methods break
