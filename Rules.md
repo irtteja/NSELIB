@@ -40,7 +40,7 @@ Hard constraints. Apply to all code, human or AI-generated.
 
 ## Documentation
 
-19. Update `Tasks.md` (check off) and `Progress.md` (add dated entry) after every significant change.
+19. Update `Tasks.md` (check off) and `Progress.md` (add dated entry) after **every** change — no exceptions, even small fixes. Do it in the same commit as the code change.
 20. Do not use lorem ipsum or placeholder content anywhere.
 21. Method docstrings: one line describing what it returns, not what it does internally. Include return type example if non-obvious.
 
