@@ -6,6 +6,15 @@ Newest entries at top.
 
 ## 2026-10-23 (continued)
 
+### Added nseindia.in fallback to NSESession
+- Discovered `www.nseindia.in` is NSE's new parallel domain — accessible from cloud IPs
+- Probed all major endpoints: marketStatus, allIndices, index-names, holiday-master, market-turnover, gainers, corporate-announcements, corporate-board-meetings all return full data; option-chain returns 200 but empty (F&O not yet migrated); quote-equity still 403
+- Added `NSE_BASE_IN`, `NSE_API_IN`, `_HEADERS_IN` to `core.py`
+- `NSESession.get()` now tries `.in` automatically when `.com` returns 403 (cloud/IP block); if `.in` also fails or returns empty, raises the original error — zero behaviour change for working methods
+- `_refresh_cookies_in()` builds a proper Akamai session on `.in` (homepage + one nav page)
+- Ready: when NSE completes the `.in` migration (especially F&O/quotes), the fallback activates without any code change
+- Verified: `_test_all()` → 36 ok, 7 cloud-blocked, 0 broken (no regressions)
+
 ### Fixed shareholding_patterns and healthcheck credit_ratings registry
 - `shareholding_patterns()` was returning `[]` — NSE returns `data` as a dict keyed by quarter-end date (`{"04-Dec-2025": [...]}`) not a list; fixed to flatten into `[{"date": "04-Dec-2025", ...row}]`
 - `credit_ratings` in healthcheck registry was called with `("INFY",)` — INFY has no current filings so it returned `[]` (valid, not a bug); changed registry to `()` (no symbol filter) so the endpoint health is verified against the full feed
