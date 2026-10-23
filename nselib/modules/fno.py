@@ -208,3 +208,155 @@ class FnoMixin:
         """Equity derivatives snapshot. index: 'futures' or 'options'."""
         params = {"index": index}
         return (self._guardian.guarded_get if self._guardian else self._session.get)("snapshot-derivatives-equity", params)
+
+    # ------------------------------------------------------------------ #
+    #  Archive-based data (works from any IP)                              #
+    # ------------------------------------------------------------------ #
+
+    def fno_ban_list(self, trade_date: date | None = None) -> list[str]:
+        """
+        F&O securities in ban period for a given trade date.
+        Defaults to most recent available trading day.
+        Returns list of symbols currently banned (exceeded 95% MWPL).
+        """
+        from datetime import timedelta
+        d = trade_date or date.today()
+        for offset in range(5):
+            check = d - timedelta(days=offset)
+            url = (
+                f"{_ARCHIVE}/archives/fo/sec_ban/fo_secban_{check.strftime('%d%m%Y')}.csv"
+            )
+            try:
+                r = self._session._s.get(url, timeout=8)
+                if r.status_code == 200 and b"DOCTYPE" not in r.content[:50]:
+                    symbols = []
+                    for line in r.text.splitlines()[1:]:
+                        parts = line.strip().split(",")
+                        if len(parts) >= 2 and parts[1].strip():
+                            symbols.append(parts[1].strip())
+                    return symbols
+            except Exception:
+                continue
+        return []
+
+    def participant_oi(self, trade_date: date | None = None) -> list[dict]:
+        """
+        Participant-wise Open Interest in equity derivatives (FII/DII/Client/Pro).
+        Defaults to most recent available trading day.
+
+        Each dict: participant, future_index_long, future_index_short,
+          future_stock_long, future_stock_short,
+          option_index_call_long, option_index_put_long,
+          option_index_call_short, option_index_put_short,
+          option_stock_call_long, option_stock_put_long,
+          option_stock_call_short, option_stock_put_short,
+          total_long, total_short
+        """
+        import csv as _csv2, io as _io2
+        from datetime import timedelta
+        d = trade_date or date.today()
+        for offset in range(5):
+            check = d - timedelta(days=offset)
+            url = (
+                f"{_ARCHIVE}/content/nsccl/"
+                f"fao_participant_oi_{check.strftime('%d%m%Y')}.csv"
+            )
+            try:
+                r = self._session._s.get(url, timeout=8)
+                if r.status_code == 200 and b"DOCTYPE" not in r.content[:50]:
+                    reader = _csv2.reader(_io2.StringIO(r.text))
+                    rows = list(reader)
+                    # row[0] = header description, row[1] = column names, rows[2:] = data
+                    data_rows = [row for row in rows[2:] if row and row[0].strip() and row[0].strip() != "TOTAL"]
+                    keys = [
+                        "participant",
+                        "future_index_long", "future_index_short",
+                        "future_stock_long", "future_stock_short",
+                        "option_index_call_long", "option_index_put_long",
+                        "option_index_call_short", "option_index_put_short",
+                        "option_stock_call_long", "option_stock_put_long",
+                        "option_stock_call_short", "option_stock_put_short",
+                        "total_long", "total_short",
+                    ]
+                    out = []
+                    for row in data_rows:
+                        if len(row) < 15:
+                            continue
+                        rec = {keys[i]: row[i].strip() for i in range(len(keys))}
+                        for k in keys[1:]:
+                            try:
+                                rec[k] = int(rec[k].replace(",", ""))
+                            except ValueError:
+                                pass
+                        out.append(rec)
+                    return out
+            except Exception:
+                continue
+        return []
+
+    def participant_volume(self, trade_date: date | None = None) -> list[dict]:
+        """
+        Participant-wise trading volume in equity derivatives (FII/DII/Client/Pro).
+        Same structure as participant_oi() but shows contracts traded (not OI).
+        """
+        import csv as _csv2, io as _io2
+        from datetime import timedelta
+        d = trade_date or date.today()
+        for offset in range(5):
+            check = d - timedelta(days=offset)
+            url = (
+                f"{_ARCHIVE}/content/nsccl/"
+                f"fao_participant_vol_{check.strftime('%d%m%Y')}.csv"
+            )
+            try:
+                r = self._session._s.get(url, timeout=8)
+                if r.status_code == 200 and b"DOCTYPE" not in r.content[:50]:
+                    reader = _csv2.reader(_io2.StringIO(r.text))
+                    rows = list(reader)
+                    data_rows = [row for row in rows[2:] if row and row[0].strip() and row[0].strip() != "TOTAL"]
+                    keys = [
+                        "participant",
+                        "future_index_long", "future_index_short",
+                        "future_stock_long", "future_stock_short",
+                        "option_index_call_long", "option_index_put_long",
+                        "option_index_call_short", "option_index_put_short",
+                        "option_stock_call_long", "option_stock_put_long",
+                        "option_stock_call_short", "option_stock_put_short",
+                        "total_long", "total_short",
+                    ]
+                    out = []
+                    for row in data_rows:
+                        if len(row) < 15:
+                            continue
+                        rec = {keys[i]: row[i].strip() for i in range(len(keys))}
+                        for k in keys[1:]:
+                            try:
+                                rec[k] = int(rec[k].replace(",", ""))
+                            except ValueError:
+                                pass
+                        out.append(rec)
+                    return out
+            except Exception:
+                continue
+        return []
+
+    def pcr(self, symbol: str, expiry: str | None = None) -> dict:
+        """
+        Put-Call Ratio for an index or stock options expiry.
+        expiry: DD-Mon-YYYY e.g. '27-Nov-2025'. Defaults to nearest expiry.
+        Returns: { expiry, total_ce_oi, total_pe_oi, pcr, symbol }
+        """
+        chain = self.compile_option_chain(symbol, expiry)
+        if not chain:
+            from ..exceptions import NSEDataError
+            raise NSEDataError(f"No option chain data for {symbol}")
+        expiry_used = next((r.get("expiry") for r in chain if r.get("expiry")), expiry or "")
+        ce_oi = sum(r.get("ce_oi", 0) or 0 for r in chain)
+        pe_oi = sum(r.get("pe_oi", 0) or 0 for r in chain)
+        return {
+            "symbol":       symbol.upper(),
+            "expiry":       expiry_used,
+            "total_ce_oi":  ce_oi,
+            "total_pe_oi":  pe_oi,
+            "pcr":          round(pe_oi / ce_oi, 3) if ce_oi else None,
+        }
