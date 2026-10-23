@@ -227,26 +227,41 @@ class CorporateMixin:
 
         return results
 
-    def financial_results_pdfs(self, symbol: str) -> list[dict]:
+    def financial_results_links(
+        self,
+        symbol:    str | None = None,
+        period:    str = "Quarterly",
+        from_date: date | None = None,
+        to_date:   date | None = None,
+    ) -> list[dict]:
         """
-        Quarterly result PDFs for a symbol as filed with NSE.
+        NSE financial results with the Details HTML page URL and XBRL URL.
 
-        Returns a list of dicts sorted newest-first:
-          date, text (filing description), pdf_url, size
+        The 'details_url' opens the NSE financial results HTML page
+        (same as the 'Details' link on the NSE website).
+        The 'xbrl_url' is the raw Ind-AS XBRL XML file.
+
+        Returns list of dicts: symbol, company, quarter, period_end,
+          consolidated, audited, broadcast_time, details_url, xbrl_url.
         """
-        ann = self.announcements(symbol=symbol)
+        _BASE = "https://www.nseindia.com/companies-listing/corporate-filings-financial-results"
+        raw = self.financial_results(
+            symbol=symbol, period=period,
+            from_date=from_date, to_date=to_date,
+        )
         out = []
-        for a in ann:
-            if a.get("desc") != "Financial Result Updates":
-                continue
-            url = a.get("attchmntFile", "")
-            if not url or not url.endswith(".pdf"):
-                continue
+        for r in raw:
+            params = r.get("params", "")
             out.append({
-                "date":    a.get("an_dt", ""),
-                "text":    a.get("attchmntText", "").strip(),
-                "pdf_url": url,
-                "size":    a.get("attFileSize") or a.get("fileSize") or "",
+                "symbol":         r.get("symbol", ""),
+                "company":        r.get("companyName", ""),
+                "quarter":        r.get("relatingTo", ""),
+                "period_end":     r.get("toDate", ""),
+                "consolidated":   r.get("consolidated", ""),
+                "audited":        r.get("audited", ""),
+                "broadcast_time": r.get("broadCastDate", ""),
+                "details_url":    f"{_BASE}?params={params}" if params else "",
+                "xbrl_url":       r.get("xbrl", ""),
             })
         return out
 
