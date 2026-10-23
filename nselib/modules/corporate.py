@@ -227,6 +227,29 @@ class CorporateMixin:
 
         return results
 
+    def financial_results_pdfs(self, symbol: str) -> list[dict]:
+        """
+        Quarterly result PDFs for a symbol as filed with NSE.
+
+        Returns a list of dicts sorted newest-first:
+          date, text (filing description), pdf_url, size
+        """
+        ann = self.announcements(symbol=symbol)
+        out = []
+        for a in ann:
+            if a.get("desc") != "Financial Result Updates":
+                continue
+            url = a.get("attchmntFile", "")
+            if not url or not url.endswith(".pdf"):
+                continue
+            out.append({
+                "date":    a.get("an_dt", ""),
+                "text":    a.get("attchmntText", "").strip(),
+                "pdf_url": url,
+                "size":    a.get("attFileSize") or a.get("fileSize") or "",
+            })
+        return out
+
     def integrated_filing_rss(
         self,
         from_date: date | None = None,
