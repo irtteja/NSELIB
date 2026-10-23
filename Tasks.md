@@ -91,6 +91,10 @@ Format: `- [ ]` pending · `- [x]` done · `- [~]` blocked/deferred
 - [ ] Expose `nse.health_check()` convenience wrapper on NSE class
 - [ ] Add `HealthChecker` to `nselib/__init__.py` exports
 
+## Rules / documentation
+
+- [x] Rule 26–28: No API key needed in Claude sessions — documented in Rules.md
+
 ## Pending / future
 
 - [ ] `vix_history(from_date, to_date)` — India VIX historical data from archive

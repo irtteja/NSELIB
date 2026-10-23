@@ -45,6 +45,12 @@ Hard constraints. Apply to all code, human or AI-generated.
 21. Do not use lorem ipsum or placeholder content anywhere.
 22. Method docstrings: one line describing what it returns, not what it does internally. Include return type example if non-obvious.
 
+## Claude session / API key
+
+26. **No Anthropic API key is needed** when running inside a Claude Code session. `Brain()` calls the local `claude` CLI automatically — `NSE(guard=True)` is all that's needed.
+27. Never pass `anthropic_api_key=` in session code, examples, or docstrings. The parameter exists only for use outside a Claude session (e.g. standalone cron scripts on a non-Claude machine).
+28. Never hardcode any API key anywhere in the library.
+
 ## Naming
 
 23. F&O ban list method: `fno_ban_list()` (not `fo_ban_list`, `ban_list`, `get_ban_list`).

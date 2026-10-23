@@ -4,6 +4,15 @@ Newest entries at top.
 
 ---
 
+## 2026-10-23 (continued, session 2)
+
+### Added Rules 26–28: no API key needed inside Claude sessions
+- `Brain()` calls the local `claude` CLI when running inside a Claude Code session — no Anthropic API key required
+- `NSE(guard=True)` is the standard instantiation; `anthropic_api_key=` parameter exists only for non-Claude environments
+- Rules.md updated with new section "Claude session / API key" (rules 26–28)
+
+---
+
 ## 2026-10-23 (continued)
 
 ### Rewrote mcp_server.py — auto-discovery, 86 tools (was 24 hardcoded)
