@@ -41,11 +41,12 @@ Hard constraints. Apply to all code, human or AI-generated.
 ## Documentation
 
 19. Update `Tasks.md` (check off) and `Progress.md` (add dated entry) after **every** change — no exceptions, even small fixes. Do it in the same commit as the code change.
-20. Do not use lorem ipsum or placeholder content anywhere.
-21. Method docstrings: one line describing what it returns, not what it does internally. Include return type example if non-obvious.
+20. After any `guardian.watch()`, `guardian.apply()`, or `guardian.verify()` run, read `~/.nselib/guardian_log.json` and record significant discoveries in `Progress.md`: new methods written, endpoints healed, methods removed after failed verification. Commit the log entry alongside any changed module files.
+21. Do not use lorem ipsum or placeholder content anywhere.
+22. Method docstrings: one line describing what it returns, not what it does internally. Include return type example if non-obvious.
 
 ## Naming
 
-22. F&O ban list method: `fno_ban_list()` (not `fo_ban_list`, `ban_list`, `get_ban_list`).
-23. Participant data: `participant_oi()` and `participant_volume()` — not "FII data" or "institutional".
-24. PCR method: `pcr(symbol, expiry)` — not `put_call_ratio`.
+23. F&O ban list method: `fno_ban_list()` (not `fo_ban_list`, `ban_list`, `get_ban_list`).
+24. Participant data: `participant_oi()` and `participant_volume()` — not "FII data" or "institutional".
+25. PCR method: `pcr(symbol, expiry)` — not `put_call_ratio`.
