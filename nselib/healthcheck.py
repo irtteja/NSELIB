@@ -82,7 +82,7 @@ _REGISTRY: dict[str, tuple[tuple, dict]] = {
     "insider_trading":           (("INFY",), {}),
     "event_calendar":            ((), {}),
     "financial_results":         ((), {"symbol": "INFY"}),
-    "credit_ratings":            (("INFY",), {}),
+    "credit_ratings":            ((), {}),
     "large_deals_snapshot":      ((), {}),
     # history
     "fetch_equity_historical_data": (("INFY",), {

@@ -6,6 +6,11 @@ Newest entries at top.
 
 ## 2026-10-23 (continued)
 
+### Fixed shareholding_patterns and healthcheck credit_ratings registry
+- `shareholding_patterns()` was returning `[]` — NSE returns `data` as a dict keyed by quarter-end date (`{"04-Dec-2025": [...]}`) not a list; fixed to flatten into `[{"date": "04-Dec-2025", ...row}]`
+- `credit_ratings` in healthcheck registry was called with `("INFY",)` — INFY has no current filings so it returned `[]` (valid, not a bug); changed registry to `()` (no symbol filter) so the endpoint health is verified against the full feed
+- Verified: `shareholding_patterns("INFY")` → 20 rows; `credit_ratings()` → 529 rows; `_test_all()` → 36 ok, 7 cloud-blocked, 0 broken
+
 ### Added HealthChecker agent (healthcheck.py)
 - New module `nselib/healthcheck.py` — full-cycle health agent for nselib
 - `_REGISTRY`: ~40 methods with default args exercising real data (INFY, NIFTY 50, etc.)

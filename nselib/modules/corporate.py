@@ -563,9 +563,18 @@ class CorporateMixin:
             params={"symbol": symbol.upper(), "market": "equities"},
         )
         shp = resp.get("shareholdings_patterns", {}) if isinstance(resp, dict) else {}
-        if isinstance(shp, dict):
-            shp = shp.get("data", shp.get("shareholding", []))
-        return shp if isinstance(shp, list) else []
+        data = shp.get("data", shp.get("shareholding", [])) if isinstance(shp, dict) else shp
+        # NSE returns data as a dict keyed by quarter-end date, e.g. {"31-Dec-2025": [...]}
+        if isinstance(data, dict):
+            rows = []
+            for quarter_date, entries in data.items():
+                if isinstance(entries, list):
+                    for entry in entries:
+                        rows.append({"date": quarter_date, **entry})
+                else:
+                    rows.append({"date": quarter_date, "data": entries})
+            return rows
+        return data if isinstance(data, list) else []
 
     def annual_reports(self, symbol: str) -> list[dict]:
         """List of annual report PDFs for a company."""
