@@ -3,31 +3,152 @@ from datetime import date, timedelta
 from typing import Any
 
 _XBRL_CRORE_TAGS = {
+    # P&L
     "RevenueFromOperations", "OtherIncome", "Income",
     "EmployeeBenefitExpense", "FinanceCosts",
     "DepreciationDepletionAndAmortisationExpense", "OtherExpenses", "Expenses",
     "ProfitBeforeExceptionalItemsAndTax", "ExceptionalItems",
-    "ProfitBeforeTax", "TaxExpense", "ProfitLossForPeriod",
-    "ProfitLossForPeriodFromContinuingOperations",
-    "TotalComprehensiveIncomeForPeriod",
+    "ProfitBeforeTax", "TaxExpense", "TaxExpenseOfDiscontinuedOperations",
+    "ProfitLossForPeriod", "ProfitLossForPeriodFromContinuingOperations",
+    "ProfitLossFromDiscontinuedOperationsAfterTax", "ProfitLossFromDiscontinuedOperationsBeforeTax",
+    "ProfitOrLossAttributableToOwnersOfParent", "ProfitOrLossAttributableToNonControllingInterests",
+    "ChangesInInventoriesOfFinishedGoodsWorkInProgressAndStockInTrade",
+    "CostOfMaterialsConsumed", "PurchasesOfStockInTrade",
+    # OCI
+    "OtherComprehensiveIncome", "OtherComprehensiveIncomeNetOfTaxes",
+    "AmountOfItemThatWillBeReclassifiedToProfitAndLoss",
+    "AmountOfItemThatWillNotBeReclassifiedToProfitAndLoss",
+    "IncomeTaxRelatingToItemsThatWillBeReclassifiedToProfitOrLoss",
+    "IncomeTaxRelatingToItemsThatWillNotBeReclassifiedToProfitOrLoss",
+    "ComprehensiveIncomeForThePeriod",
+    "ComprehensiveIncomeForThePeriodAttributableToOwnersOfParent",
+    "ComprehensiveIncomeForThePeriodAttributableToOwnersOfParentNonControllingInterests",
+    # Balance Sheet — Assets
+    "Assets", "CurrentAssets", "NoncurrentAssets", "EquityAndLiabilities",
+    "CashAndCashEquivalents", "BankBalanceOtherThanCashAndCashEquivalents",
+    "CurrentInvestments", "NoncurrentInvestments",
+    "CurrentFinancialAssets", "NoncurrentFinancialAssets",
+    "TradeReceivablesCurrent", "TradeReceivablesNoncurrent",
+    "LoansCurrent", "LoansNoncurrent",
+    "OtherCurrentAssets", "OtherNoncurrentAssets",
+    "OtherCurrentFinancialAssets", "OtherNoncurrentFinancialAssets",
+    "PropertyPlantAndEquipment", "CapitalWorkInProgress",
+    "Goodwill", "OtherIntangibleAssets", "IntangibleAssetsUnderDevelopment",
+    "DeferredTaxAssetsNet", "CurrentTaxAssets",
+    "Inventories", "InvestmentProperty", "InvestmentsAccountedForUsingEquityMethod",
+    "BiologicalAssetsOtherThanBearerPlants",
+    # Balance Sheet — Equity & Liabilities
+    "Equity", "EquityShareCapital", "OtherEquity", "NonControllingInterest",
+    "PaidUpValueOfEquityShareCapital", "EquityAttributableToOwnersOfParent",
+    "Liabilities", "CurrentLiabilities", "NoncurrentLiabilities",
+    "CurrentFinancialLiabilities", "NoncurrentFinancialLiabilities",
+    "BorrowingsCurrent", "BorrowingsNoncurrent",
+    "TradePayablesCurrent", "TradePayablesNoncurrent",
+    "TotalOutstandingDuesOfMicroEnterpriseAndSmallEnterpriseCurrent",
+    "TotalOutstandingDuesOfCreditorsOtherThanMicroEnterpriseAndSmallEnterpriseCurrent",
+    "TotalOutstandingDuesOfMicroEnterpriseAndSmallEnterpriseNoncurrent",
+    "TotalOutstandingDuesOfCreditorsOtherThanMicroEnterpriseAndSmallEnterpriseNoncurrent",
+    "OtherCurrentLiabilities", "OtherNoncurrentLiabilities",
+    "OtherCurrentFinancialLiabilities", "OtherNoncurrentFinancialLiabilities",
+    "ProvisionsCurrent", "ProvisionsNoncurrent",
+    "DeferredTaxLiabilitiesNet", "DeferredTax", "CurrentTaxLiabilities", "CurrentTax",
+    "DeferredGovernmentGrantsCurrent", "DeferredGovernmentGrantsNoncurrent",
+    # Cash Flow — Totals
+    "CashFlowsFromUsedInOperatingActivities", "CashFlowsFromUsedInInvestingActivities",
+    "CashFlowsFromUsedInFinancingActivities", "CashFlowsFromUsedInOperations",
+    "CashAndCashEquivalentsCashFlowStatement",
+    "IncreaseDecreaseInCashAndCashEquivalents",
+    "IncreaseDecreaseInCashAndCashEquivalentsBeforeEffectOfExchangeRateChanges",
+    "EffectOfExchangeRateChangesOnCashAndCashEquivalents",
+    # Cash Flow — Key line items
+    "DividendsPaidClassifiedAsFinancingActivities",
+    "IncomeTaxesPaidRefundClassifiedAsOperatingActivities",
+    "IncomeTaxesPaidRefundClassifiedAsInvestingActivities",
+    "IncomeTaxesPaidRefundClassifiedAsFinancingActivities",
+    "InterestReceivedClassifiedAsInvestingActivities",
+    "InterestReceivedClassifiedAsOperatingActivities",
+    "InterestPaidClassifiedAsOperatingActivities",
+    "InterestPaidClassifiedAsFinancingActivities",
+    "DividendsReceivedClassifiedAsInvestingActivities",
+    "DividendsReceivedClassifiedAsOperatingActivities",
+    "PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities",
+    "PurchaseOfIntangibleAssetsClassifiedAsInvestingActivities",
+    "PurchaseOfIntangibleAssetsUnderDevelopment",
+    "PurchaseOfInvestmentPropertyClassifiedAsInvestingActivities",
+    "PurchaseOfOtherLongTermAssetsClassifiedAsInvestingActivities",
+    "CashFlowsUsedInObtainingControlOfSubsidiariesOrOtherBusinessesClassifiedAsInvestingActivities",
+    "CashFlowsFromLosingControlOfSubsidiariesOrOtherBusinessesClassifiedAsInvestingActivities",
+    "ProceedsFromSalesOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities",
+    "ProceedsFromSalesOfIntangibleAssetsClassifiedAsInvestingActivities",
+    "ProceedsFromBorrowingsClassifiedAsFinancingActivities",
+    "RepaymentsOfBorrowingsClassifiedAsFinancingActivities",
+    "ProceedsFromIssuingSharesClassifiedAsFinancingActivities",
+    "PaymentsToAcquireOrRedeemEntitysShares",
+    "ProceedsFromExerciseOfStockOptions",
+    "PaymentsOfLeaseLiabilitiesClassifiedAsFinancingActivities",
+    "OtherInflowsOutflowsOfCashClassifiedAsOperatingActivities",
+    "OtherInflowsOutflowsOfCashClassifiedAsInvestingActivities",
+    "OtherInflowsOutflowsOfCashClassifiedAsFinancingActivities",
+    # Cash Flow — Working capital adjustments
+    "AdjustmentsForReconcileProfitLoss",
+    "AdjustmentsForDepreciationAndAmortisationExpense",
+    "AdjustmentsForFinanceCosts", "AdjustmentsForInterestIncome",
+    "AdjustmentsForDividendIncome", "AdjustmentsForFairValueGainsLosses",
+    "AdjustmentsForSharebasedPayments", "AdjustmentsForUnrealisedForeignExchangeLossesGains",
+    "AdjustmentsForImpairmentLossReversalOfImpairmentLossRecognisedInProfitOrLoss",
+    "AdjustmentsForDecreaseIncreaseInInventories",
+    "AdjustmentsForDecreaseIncreaseInTradeReceivablesCurrent",
+    "AdjustmentsForDecreaseIncreaseInTradeReceivablesNoncurrent",
+    "AdjustmentsForDecreaseIncreaseInOtherCurrentAssets",
+    "AdjustmentsForDecreaseIncreaseInOtherNoncurrentAssets",
+    "AdjustmentsForIncreaseDecreaseInTradePayablesCurrent",
+    "AdjustmentsForIncreaseDecreaseInTradePayablesNoncurrent",
+    "AdjustmentsForIncreaseDecreaseInOtherCurrentLiabilities",
+    "AdjustmentsForIncreaseDecreaseInOtherNoncurrentLiabilities",
+    "AdjustmentsForProvisionsCurrent", "AdjustmentsForProvisionsNoncurrent",
+    "AdjustmentsForOtherBankBalances",
+    "AdjustmentsForOtherFinancialAssetsCurrent", "AdjustmentsForOtherFinancialAssetsNoncurrent",
+    "AdjustmentsForOtherFinancialLiabilitiesCurrent", "AdjustmentsForOtherFinancialLiabilitiesNoncurrent",
+    "AdjustmentsForUndistributedProfitsOfAssociates",
+    "OtherAdjustmentsForNoncashItems", "OtherAdjustmentsToReconcileProfitLoss",
+    "OtherAdjustmentsForWhichCashEffectsAreInvestingOrFinancingCashFlow",
+    # Segments
+    "SegmentRevenue", "SegmentRevenueFromOperations",
+    "SegmentProfitBeforeTax", "SegmentProfitLossBeforeTaxAndFinanceCosts",
+    "SegmentFinanceCosts", "SegmentAssets", "SegmentLiabilities",
+    "NetSegmentAssets", "NetSegmentLiabilities",
+    "UnAllocableAssets", "UnAllocableLiabilities",
+    "OtherUnallocableExpenditureNetOffUnAllocableIncome", "InterSegmentRevenue",
 }
 _XBRL_META_TAGS = {
     "Symbol", "NameOfTheCompany", "ReportingQuarter",
     "DateOfStartOfReportingPeriod", "DateOfEndOfReportingPeriod",
-    "NatureOfReportStandaloneConsolidated", "LevelOfRoundingUsedInFinancialStatements",
+    "DateOfStartOfFinancialYear", "DateOfEndOfFinancialYear",
+    "DateOfBoardMeetingWhenFinancialResultsWereApproved",
+    "NatureOfReportStandaloneConsolidated", "LevelOfRounding",
     "WhetherResultsAreAuditedOrUnaudited",
+    "TypeOfCompany", "TypeOfReportingPeriod", "TypeOfCashFlowStatement",
+    "IsCompanyReportingMultisegmentOrSingleSegment",
+    "AuditorsFirmName", "ClassOfSecurity", "ISIN", "MSEISymbol",
+    "WhetherCashFlowStatementIsApplicableOnCompany",
+    "DescriptionOfReportableSegment",
 }
 _XBRL_EPS_TAGS = {
     "BasicEarningsLossPerShareFromContinuingOperations",
     "DilutedEarningsLossPerShareFromContinuingOperations",
     "BasicEarningsLossPerShareFromTotalOperations",
     "DilutedEarningsLossPerShareFromTotalOperations",
+    "BasicEarningsLossPerShareFromContinuingAndDiscontinuedOperations",
+    "DilutedEarningsLossPerShareFromContinuingAndDiscontinuedOperations",
+    "BasicEarningsLossPerShareFromDiscontinuedOperations",
+    "DilutedEarningsLossPerShareFromDiscontinuedOperations",
 }
-_ALL_XBRL_TAGS = _XBRL_CRORE_TAGS | _XBRL_META_TAGS | _XBRL_EPS_TAGS
+_XBRL_SMALL_NUM_TAGS = {"FaceValueOfEquityShareCapital", "ScripCode"}
+_ALL_XBRL_TAGS = _XBRL_CRORE_TAGS | _XBRL_META_TAGS | _XBRL_EPS_TAGS | _XBRL_SMALL_NUM_TAGS
 
 
 def _parse_xbrl(xml_bytes: bytes) -> dict:
-    """Parse an NSE Ind-AS XBRL file into a flat dict of financials."""
+    """Parse an NSE Ind-AS XBRL file into a flat dict; monetary values in ₹ Crores."""
     root = ET.fromstring(xml_bytes)
     raw: dict = {}
     for elem in root.iter():
@@ -42,7 +163,7 @@ def _parse_xbrl(xml_bytes: bytes) -> dict:
             continue
         try:
             num = float(v)
-            if k in _XBRL_EPS_TAGS:
+            if k in _XBRL_EPS_TAGS or k in _XBRL_SMALL_NUM_TAGS:
                 out[k] = round(num, 2)
             elif k in _XBRL_CRORE_TAGS:
                 out[k] = round(num / crore, 2)
@@ -196,33 +317,122 @@ class CorporateMixin:
                 continue
 
             qe = filing.get("qe_Date", "")
+            g = xbrl.get
+            ebit = (
+                round(xbrl["Income"] - xbrl["Expenses"] + (g("FinanceCosts") or 0), 2)
+                if g("Income") and g("Expenses") else None
+            )
             results.append({
-                "symbol":                  xbrl.get("Symbol", symbol.upper()),
-                "company":                 xbrl.get("NameOfTheCompany", ""),
-                "quarter":                 xbrl.get("ReportingQuarter", ""),
-                "period_start":            xbrl.get("DateOfStartOfReportingPeriod", ""),
-                "period_end":              xbrl.get("DateOfEndOfReportingPeriod", qe),
-                "type":                    nature,
-                "audited":                 xbrl.get("WhetherResultsAreAuditedOrUnaudited", ""),
-                "revenue_from_operations": xbrl.get("RevenueFromOperations"),
-                "other_income":            xbrl.get("OtherIncome"),
-                "total_income":            xbrl.get("Income"),
-                "employee_costs":          xbrl.get("EmployeeBenefitExpense"),
-                "finance_costs":           xbrl.get("FinanceCosts"),
-                "depreciation":            xbrl.get("DepreciationDepletionAndAmortisationExpense"),
-                "other_expenses":          xbrl.get("OtherExpenses"),
-                "total_expenses":          xbrl.get("Expenses"),
-                "ebit":                    (
-                    round(xbrl["Income"] - xbrl["Expenses"] + xbrl.get("FinanceCosts", 0), 2)
-                    if xbrl.get("Income") and xbrl.get("Expenses") else None
-                ),
-                "pbt":                     xbrl.get("ProfitBeforeTax"),
-                "tax":                     xbrl.get("TaxExpense"),
-                "pat":                     xbrl.get("ProfitLossForPeriod"),
-                "eps_basic":               xbrl.get("BasicEarningsLossPerShareFromContinuingOperations")
-                                           or xbrl.get("BasicEarningsLossPerShareFromTotalOperations"),
-                "eps_diluted":             xbrl.get("DilutedEarningsLossPerShareFromContinuingOperations")
-                                           or xbrl.get("DilutedEarningsLossPerShareFromTotalOperations"),
+                # ── identity ──────────────────────────────────────────────
+                "symbol":       g("Symbol", symbol.upper()),
+                "company":      g("NameOfTheCompany", ""),
+                "quarter":      g("ReportingQuarter", ""),
+                "period_start": g("DateOfStartOfReportingPeriod", ""),
+                "period_end":   g("DateOfEndOfReportingPeriod", qe),
+                "type":         nature,
+                "audited":      g("WhetherResultsAreAuditedOrUnaudited", ""),
+                # ── P&L (₹ Cr) ────────────────────────────────────────────
+                "revenue_from_operations": g("RevenueFromOperations"),
+                "other_income":            g("OtherIncome"),
+                "total_income":            g("Income"),
+                "employee_costs":          g("EmployeeBenefitExpense"),
+                "finance_costs":           g("FinanceCosts"),
+                "depreciation":            g("DepreciationDepletionAndAmortisationExpense"),
+                "other_expenses":          g("OtherExpenses"),
+                "total_expenses":          g("Expenses"),
+                "exceptional_items":       g("ExceptionalItems"),
+                "ebit":                    ebit,
+                "pbt":                     g("ProfitBeforeTax"),
+                "tax":                     g("TaxExpense"),
+                "pat":                     g("ProfitLossForPeriod"),
+                "eps_basic":   g("BasicEarningsLossPerShareFromContinuingOperations")
+                               or g("BasicEarningsLossPerShareFromTotalOperations"),
+                "eps_diluted": g("DilutedEarningsLossPerShareFromContinuingOperations")
+                               or g("DilutedEarningsLossPerShareFromTotalOperations"),
+                # ── OCI & Total Comprehensive Income (₹ Cr) ───────────────
+                "oci": g("OtherComprehensiveIncome"),
+                "total_comprehensive_income": g("ComprehensiveIncomeForThePeriod"),
+                # ── Balance Sheet (₹ Cr) ───────────────────────────────────
+                "balance_sheet": {
+                    "total_assets":            g("Assets"),
+                    "current_assets":          g("CurrentAssets"),
+                    "noncurrent_assets":       g("NoncurrentAssets"),
+                    "cash":                    g("CashAndCashEquivalents"),
+                    "bank_balances":           g("BankBalanceOtherThanCashAndCashEquivalents"),
+                    "current_investments":     g("CurrentInvestments"),
+                    "noncurrent_investments":  g("NoncurrentInvestments"),
+                    "trade_receivables":       g("TradeReceivablesCurrent"),
+                    "loans":                   (g("LoansCurrent") or 0) + (g("LoansNoncurrent") or 0) or None,
+                    "inventories":             g("Inventories"),
+                    "ppe":                     g("PropertyPlantAndEquipment"),
+                    "capital_wip":             g("CapitalWorkInProgress"),
+                    "goodwill":                g("Goodwill"),
+                    "intangibles":             g("OtherIntangibleAssets"),
+                    "deferred_tax_assets":     g("DeferredTaxAssetsNet"),
+                    "equity":                  g("Equity"),
+                    "equity_share_capital":    g("EquityShareCapital"),
+                    "other_equity":            g("OtherEquity"),
+                    "non_controlling_interest":g("NonControllingInterest"),
+                    "total_liabilities":       g("Liabilities"),
+                    "current_liabilities":     g("CurrentLiabilities"),
+                    "noncurrent_liabilities":  g("NoncurrentLiabilities"),
+                    "borrowings_current":      g("BorrowingsCurrent"),
+                    "borrowings_noncurrent":   g("BorrowingsNoncurrent"),
+                    "trade_payables":          g("TradePayablesCurrent"),
+                    "other_current_liabilities":   g("OtherCurrentLiabilities"),
+                    "other_noncurrent_liabilities":g("OtherNoncurrentLiabilities"),
+                    "provisions_current":      g("ProvisionsCurrent"),
+                    "provisions_noncurrent":   g("ProvisionsNoncurrent"),
+                    "deferred_tax_liabilities":g("DeferredTaxLiabilitiesNet"),
+                },
+                # ── Cash Flow (₹ Cr) ──────────────────────────────────────
+                "cash_flow": {
+                    "operating":       g("CashFlowsFromUsedInOperatingActivities"),
+                    "investing":       g("CashFlowsFromUsedInInvestingActivities"),
+                    "financing":       g("CashFlowsFromUsedInFinancingActivities"),
+                    "net_change":      g("IncreaseDecreaseInCashAndCashEquivalents"),
+                    "fx_effect":       g("EffectOfExchangeRateChangesOnCashAndCashEquivalents"),
+                    "closing_cash":    g("CashAndCashEquivalentsCashFlowStatement"),
+                    "dividends_paid":  g("DividendsPaidClassifiedAsFinancingActivities"),
+                    "capex":           g("PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities"),
+                    "acquisitions":    g("CashFlowsUsedInObtainingControlOfSubsidiariesOrOtherBusinessesClassifiedAsInvestingActivities"),
+                    "tax_paid":        g("IncomeTaxesPaidRefundClassifiedAsOperatingActivities"),
+                    "interest_received": g("InterestReceivedClassifiedAsInvestingActivities"),
+                    "lease_payments":  g("PaymentsOfLeaseLiabilitiesClassifiedAsFinancingActivities"),
+                    "buyback":         g("PaymentsToAcquireOrRedeemEntitysShares"),
+                    "debt_repaid":     g("RepaymentsOfBorrowingsClassifiedAsFinancingActivities"),
+                },
+                # ── Segments (₹ Cr) ───────────────────────────────────────
+                "segments": {
+                    "is_multi_segment":      g("IsCompanyReportingMultisegmentOrSingleSegment"),
+                    "segment_name":          g("DescriptionOfReportableSegment"),
+                    "revenue":               g("SegmentRevenue") or g("SegmentRevenueFromOperations"),
+                    "profit_before_tax":     g("SegmentProfitBeforeTax"),
+                    "ebit":                  g("SegmentProfitLossBeforeTaxAndFinanceCosts"),
+                    "finance_costs":         g("SegmentFinanceCosts"),
+                    "assets":                g("SegmentAssets"),
+                    "liabilities":           g("SegmentLiabilities"),
+                    "unallocated_expense_net": g("OtherUnallocableExpenditureNetOffUnAllocableIncome"),
+                    "inter_segment_revenue": g("InterSegmentRevenue"),
+                },
+                # ── Attribution (₹ Cr) ────────────────────────────────────
+                "attribution": {
+                    "pat_to_owners": g("ProfitOrLossAttributableToOwnersOfParent"),
+                    "pat_to_nci":    g("ProfitOrLossAttributableToNonControllingInterests"),
+                    "tci_to_owners": g("ComprehensiveIncomeForThePeriodAttributableToOwnersOfParent"),
+                    "tci_to_nci":    g("ComprehensiveIncomeForThePeriodAttributableToOwnersOfParentNonControllingInterests"),
+                },
+                # ── Meta ──────────────────────────────────────────────────
+                "meta": {
+                    "board_meeting_date": g("DateOfBoardMeetingWhenFinancialResultsWereApproved"),
+                    "fy_start":           g("DateOfStartOfFinancialYear"),
+                    "fy_end":             g("DateOfEndOfFinancialYear"),
+                    "auditor":            g("AuditorsFirmName"),
+                    "isin":               g("ISIN"),
+                    "scrip_code":         g("ScripCode"),
+                    "face_value":         g("FaceValueOfEquityShareCapital"),
+                    "cash_flow_type":     g("TypeOfCashFlowStatement"),
+                },
             })
 
         return results
