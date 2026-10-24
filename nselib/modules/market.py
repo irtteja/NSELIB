@@ -292,3 +292,9 @@ class MarketMixin:
         """Live top gainers/losers variations. index: 'gainers' or 'loosers'."""
         params = {"index": index}
         return (self._guardian.guarded_get if self._guardian else self._session.get)("live-analysis-variations", params)
+
+    def stocks_traded(self):
+        """Live count of stocks traded (advances/declines/unchanged summary)."""
+        params = {}
+        data = (self._guardian.guarded_get if self._guardian else self._session.get)("live-analysis-stocksTraded", params)
+        return data
