@@ -294,7 +294,5 @@ class MarketMixin:
         return (self._guardian.guarded_get if self._guardian else self._session.get)("live-analysis-variations", params)
 
     def stocks_traded(self):
-        """Live count of stocks traded (advances/declines/unchanged summary)."""
-        params = {}
-        data = (self._guardian.guarded_get if self._guardian else self._session.get)("live-analysis-stocksTraded", params)
-        return data
+        """Full market snapshot: advances/declines/unchanged counts + per-stock LTP, % change, volume, market cap."""
+        return (self._guardian.guarded_get if self._guardian else self._session.get)("live-analysis-stocksTraded", {})
