@@ -37,6 +37,7 @@ Hard constraints. Apply to all code, human or AI-generated.
 
 17. Before marking any new method as working in `Tasks.md` or `Progress.md`, call it and confirm it returns non-empty data.
 18. Archive-based methods must be tested with a known past date (not just `date.today()`) to confirm parsing is correct.
+29. Guardian-added methods MUST pass `verify()` before being committed to git. `safe_to_commit` in the HealthChecker discovery report must be `True`. Methods with `_verify_status` other than `"pass"` or `"fixed"` must not be committed — they are removed from the module file automatically.
 
 ## Documentation
 
