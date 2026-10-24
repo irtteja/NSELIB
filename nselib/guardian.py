@@ -570,6 +570,10 @@ class Guardian:
         if self._discoveries:
             print(f"[Guardian] Verifying {len(self._discoveries)} new method(s)…")
             results = self.verify(nselib_dir, nse_instance=nse_instance)
+            # write status back onto each discovery so HealthChecker can read it
+            verify_map = {r["method"]: r["status"] for r in results}
+            for d in self._discoveries:
+                d["_verify_status"] = verify_map.get(d.get("method_name"), "skipped")
             passed  = sum(1 for r in results if r["status"] in ("pass", "fixed"))
             removed = sum(1 for r in results if r["status"] == "removed")
             failed  = sum(1 for r in results if r["status"] == "failed")
@@ -658,7 +662,16 @@ class Guardian:
                                         fixed_code, flags=re.MULTILINE).strip()
 
                     if not fixed_code or not target.exists():
-                        detail = f"unfixable: no fix generated ({last_error})"
+                        # no fix generated — remove the broken method from the file
+                        if target.exists():
+                            file_text    = target.read_text()
+                            bad_indented = "\n    ".join(last_code.strip().splitlines())
+                            cleaned      = file_text.replace(f"\n\n    {bad_indented}\n", "", 1)
+                            if cleaned != file_text:
+                                target.write_text(cleaned)
+                                print(f"[Guardian] ✗ {method_name} — no fix generated, removed from file")
+                        detail = f"removed: no fix generated ({last_error})"
+                        status = "removed"
                         break
 
                     old_indented = "\n    ".join(last_code.strip().splitlines())

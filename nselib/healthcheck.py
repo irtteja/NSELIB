@@ -315,18 +315,32 @@ class HealthChecker:
 
         modified = g.apply(nselib_dir, nse_instance=self._nse)
 
-        # verify() runs inside apply() — collect from guardian's own log
+        # verify() runs inside apply() and writes _verify_status back onto each discovery
         verify_results = getattr(g, "_discoveries", [])
         passed  = sum(1 for d in verify_results
                       if d.get("_verify_status") in ("pass", "fixed"))
         removed = sum(1 for d in verify_results
                       if d.get("_verify_status") == "removed")
 
+        # Rule 17: only report methods that actually passed verification
+        verified_methods = [d.get("method_name") for d in verify_results
+                            if d.get("_verify_status") in ("pass", "fixed")]
+        unverified = [d.get("method_name") for d in verify_results
+                      if d.get("_verify_status") not in ("pass", "fixed", "skipped")]
+
+        if unverified:
+            print(f"[HealthChecker]  ⚠ Unverified/removed methods (not safe to commit): {unverified}")
+        if not verified_methods and modified:
+            print("[HealthChecker]  ⚠ No methods passed verification — skipping commit of modified files.")
+
         return {
             "new_endpoints":    len(discoveries),
             "applied":          len(modified),
             "verified_pass":    passed,
             "verified_removed": removed,
+            "verified_methods": verified_methods,
+            "unverified":       unverified,
+            "safe_to_commit":   passed > 0,
             "methods":          [d.get("method_name") for d in discoveries],
         }
 

@@ -4,6 +4,17 @@ Newest entries at top.
 
 ---
 
+## 2026-10-24 (continued)
+
+### Fixed Rule 17 violation — guardian now enforces verification before commit
+- Bug 1: `verify()` never wrote results back to `_discoveries` — `_verify_status` was always unset, so `verified_pass` was always 0 in HealthChecker reports
+- Bug 2: `verify()` with status `"failed"` (brain returned no fix code) left the broken method in the file — now removes it and sets status `"removed"`
+- Fix: `apply()` now writes `_verify_status` onto each discovery dict after `verify()` completes
+- Fix: HealthChecker `_run_discovery()` now surfaces `safe_to_commit`, `verified_methods`, and `unverified` in report
+- Fix: Saturday HealthChecker scheduled task prompt updated — only commits guardian-added module files when `safe_to_commit: True`
+
+---
+
 ## 2026-10-24
 
 ### HealthChecker Saturday run — all clean
