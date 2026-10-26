@@ -1,10 +1,18 @@
+import csv as _csv
+import io as _io
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
+_ARCHIVE = "https://nsearchives.nseindia.com"
+
 
 def _ddmmyyyy(d: date) -> str:
     return d.strftime("%d%m%Y")
+
+
+def _ddmmyy(d: date) -> str:
+    return d.strftime("%d%m%y")
 
 
 def _ddmonyyyy(d: date) -> str:
@@ -26,8 +34,16 @@ def _trading_days(from_date: date, to_date: date) -> list[date]:
     return out
 
 
+def _parse_csv_url(session, url: str) -> list[dict]:
+    """Fetch a CSV URL directly and return list of dicts (no file written)."""
+    r = session._s.get(url, timeout=15)
+    r.raise_for_status()
+    reader = _csv.DictReader(_io.StringIO(r.text))
+    return [row for row in reader]
+
+
 class DownloadsMixin:
-    """Bhavcopy downloads, daily reports, and document fetches."""
+    """Bhavcopy downloads, equity research data, and document fetches."""
 
     # ------------------------------------------------------------------ #
     #  Bhavcopy — single day                                              #
@@ -44,7 +60,7 @@ class DownloadsMixin:
         """
         dt = dt or (date.today() - timedelta(days=1))
         filename = f"BhavCopy_NSE_CM_0_0_0_{dt.strftime('%Y%m%d')}_F_0000.csv.zip"
-        url = f"https://nsearchives.nseindia.com/content/cm/{filename}"
+        url = f"{_ARCHIVE}/content/cm/{filename}"
         _dl = lambda u: self._session.download_zip(u, folder=Path(folder))
         return self._guardian.guarded_archive(url, _dl) if self._guardian else _dl(url)
 
@@ -56,7 +72,7 @@ class DownloadsMixin:
         """Delivery position bhavcopy (MTO/delivery data)."""
         dt = dt or (date.today() - timedelta(days=1))
         filename = f"MTO_{_ddmmyyyy(dt)}.DAT"
-        url = f"https://nsearchives.nseindia.com/archives/equities/mto/{filename}"
+        url = f"{_ARCHIVE}/archives/equities/mto/{filename}"
         _dl = lambda u: self._session.download_file(u, folder=Path(folder), filename=filename)
         return self._guardian.guarded_archive(url, _dl) if self._guardian else _dl(url)
 
@@ -68,7 +84,7 @@ class DownloadsMixin:
         """F&O bhavcopy CSV."""
         dt = dt or (date.today() - timedelta(days=1))
         filename = f"BhavCopy_NSE_FO_0_0_0_{dt.strftime('%Y%m%d')}_F_0000.csv.zip"
-        url = f"https://nsearchives.nseindia.com/content/fo/{filename}"
+        url = f"{_ARCHIVE}/content/fo/{filename}"
         _dl = lambda u: self._session.download_zip(u, folder=Path(folder))
         return self._guardian.guarded_archive(url, _dl) if self._guardian else _dl(url)
 
@@ -80,7 +96,7 @@ class DownloadsMixin:
         """Index daily values bhavcopy CSV."""
         dt = dt or (date.today() - timedelta(days=1))
         filename = f"ind_close_all_{_ddmmyyyy(dt)}.csv"
-        url = f"https://nsearchives.nseindia.com/content/indices/{filename}"
+        url = f"{_ARCHIVE}/content/indices/{filename}"
         _dl = lambda u: self._session.download_file(u, folder=Path(folder), filename=filename)
         return self._guardian.guarded_archive(url, _dl) if self._guardian else _dl(url)
 
@@ -89,11 +105,29 @@ class DownloadsMixin:
         dt:     date | None = None,
         folder: str | Path  = ".",
     ) -> Path:
-        """PR bhavcopy (all segments combined)."""
+        """PR bhavcopy (all segments combined). Uses 2-digit year format."""
         dt = dt or (date.today() - timedelta(days=1))
-        filename = f"PR{_ddmmyyyy(dt)}.zip"
-        url = f"https://nsearchives.nseindia.com/archives/equities/bhavcopy/{filename}"
+        filename = f"PR{_ddmmyy(dt)}.zip"
+        url = f"{_ARCHIVE}/archives/equities/bhavcopy/pr/{filename}"
         _dl = lambda u: self._session.download_zip(u, folder=Path(folder))
+        return self._guardian.guarded_archive(url, _dl) if self._guardian else _dl(url)
+
+    def full_bhavcopy_delivery(
+        self,
+        dt:     date | None = None,
+        folder: str | Path  = ".",
+    ) -> Path:
+        """
+        Full bhavcopy with delivery data for all EQ series stocks.
+        Columns: SYMBOL, SERIES, DATE1, PREV_CLOSE, OPEN_PRICE, HIGH_PRICE,
+                 LOW_PRICE, LAST_PRICE, CLOSE_PRICE, AVG_PRICE, TTL_TRD_QNTY,
+                 TURNOVER_LACS, NO_OF_TRADES, DELIV_QTY, DELIV_PER
+        ~3543 rows per day.
+        """
+        dt = dt or (date.today() - timedelta(days=1))
+        filename = f"sec_bhavdata_full_{_ddmmyyyy(dt)}.csv"
+        url = f"{_ARCHIVE}/products/content/{filename}"
+        _dl = lambda u: self._session.download_file(u, folder=Path(folder), filename=filename)
         return self._guardian.guarded_archive(url, _dl) if self._guardian else _dl(url)
 
     # ------------------------------------------------------------------ #
@@ -139,6 +173,84 @@ class DownloadsMixin:
         return results
 
     # ------------------------------------------------------------------ #
+    #  Equity research data (cloud-safe, archive-based)                   #
+    # ------------------------------------------------------------------ #
+
+    def pe_ratio(self, dt: date | None = None) -> list[dict]:
+        """
+        P/E ratio for all listed stocks for a given date.
+        Returns list of dicts with keys: SYMBOL, SYMBOL P/E, ADJUSTED P/E
+        ~2262 rows. Uses 2-digit year format in filename.
+        dt defaults to yesterday.
+        """
+        dt = dt or (date.today() - timedelta(days=1))
+        url = f"{_ARCHIVE}/content/equities/peDetail/PE_{_ddmmyy(dt)}.csv"
+        return _parse_csv_url(self._session, url)
+
+    def week52_high_low(self, dt: date | None = None) -> list[dict]:
+        """
+        52-week adjusted high and low for all NSE stocks.
+        Returns list of dicts with keys:
+          SYMBOL, SERIES, Adjusted_52_Week_High, 52_Week_High_Date,
+          Adjusted_52_Week_Low, 52_Week_Low_DT
+        ~5946 rows. Skips 2 disclaimer header rows.
+        dt defaults to yesterday.
+        """
+        dt = dt or (date.today() - timedelta(days=1))
+        url = f"{_ARCHIVE}/content/CM_52_wk_High_low_{_ddmmyyyy(dt)}.csv"
+        r = self._session._s.get(url, timeout=15)
+        r.raise_for_status()
+        lines = r.text.splitlines()
+        # First 2 lines are disclaimer text, not CSV header
+        data_text = "\n".join(lines[2:])
+        reader = _csv.DictReader(_io.StringIO(data_text))
+        return [row for row in reader]
+
+    def short_selling(self, dt: date | None = None) -> list[dict]:
+        """
+        Short selling positions reported by brokers for a given date.
+        Returns list of dicts with keys:
+          Security Name, Symbol Name, Trade Date, Quantity
+        dt defaults to yesterday.
+        """
+        dt = dt or (date.today() - timedelta(days=1))
+        url = f"{_ARCHIVE}/archives/equities/shortSelling/shortselling_{_ddmmyyyy(dt)}.csv"
+        return _parse_csv_url(self._session, url)
+
+    def surveillance_indicator(self, dt: date | None = None) -> list[dict]:
+        """
+        Surveillance indicators for listed stocks (GSM, ASM, IRP, etc.).
+        Returns list of dicts with keys:
+          ScripCode, Symbol, Nse Exclusive, Status, Series,
+          GSM, Long_Term_ASM, Unsolicited_SMS, IRP, Short_Term_ASM, ...
+        ~3211 rows. Uses 2-digit year format.
+        dt defaults to yesterday.
+        """
+        dt = dt or (date.today() - timedelta(days=1))
+        url = f"{_ARCHIVE}/content/cm/REG_IND{_ddmmyy(dt)}.csv"
+        return _parse_csv_url(self._session, url)
+
+    def bulk_deals_archive(self) -> list[dict]:
+        """
+        Today's bulk deals (rolling file — always reflects the current trading day).
+        Returns list of dicts with keys:
+          Date, Symbol, Security Name, Client Name, Buy/Sell,
+          Quantity Traded, Trade Price / Wght. Avg. Price, Remarks
+        Cloud-safe: uses nsearchives.nseindia.com.
+        """
+        url = f"{_ARCHIVE}/content/equities/bulk.csv"
+        return _parse_csv_url(self._session, url)
+
+    def block_deals_archive(self) -> list[dict]:
+        """
+        Today's block deals (rolling file — always reflects the current trading day).
+        Same schema as bulk_deals_archive().
+        Cloud-safe: uses nsearchives.nseindia.com.
+        """
+        url = f"{_ARCHIVE}/content/equities/block.csv"
+        return _parse_csv_url(self._session, url)
+
+    # ------------------------------------------------------------------ #
     #  Daily reports                                                       #
     # ------------------------------------------------------------------ #
 
@@ -150,7 +262,7 @@ class DownloadsMixin:
         """Price band (circuit limits) report for the given date."""
         dt = dt or (date.today() - timedelta(days=1))
         filename = f"MW{_ddmmyyyy(dt)}.zip"
-        url = f"https://nsearchives.nseindia.com/archives/equities/bhavcopy/{filename}"
+        url = f"{_ARCHIVE}/archives/equities/bhavcopy/{filename}"
         _dl = lambda u: self._session.download_zip(u, folder=Path(folder))
         return self._guardian.guarded_archive(url, _dl) if self._guardian else _dl(url)
 
@@ -159,10 +271,10 @@ class DownloadsMixin:
         dt:     date | None = None,
         folder: str | Path  = ".",
     ) -> Path:
-        """CM MII Security report — listing status, ISIN, lot sizes."""
+        """CM MII Security report — OHLCV + delivery % for all EQ series stocks."""
         dt = dt or (date.today() - timedelta(days=1))
         filename = f"sec_bhavdata_full_{_ddmmyyyy(dt)}.csv"
-        url = f"https://nsearchives.nseindia.com/archives/equities/bhavcopy/{filename}"
+        url = f"{_ARCHIVE}/products/content/{filename}"
         _dl = lambda u: self._session.download_file(u, folder=Path(folder), filename=filename)
         return self._guardian.guarded_archive(url, _dl) if self._guardian else _dl(url)
 

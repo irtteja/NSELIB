@@ -82,6 +82,15 @@ Format: `- [ ]` pending · `- [x]` done · `- [~]` blocked/deferred
 - [x] `fno_bhavcopy(date)` — F&O bhavcopy
 - [x] `indices_bhavcopy(date)` — indices bhavcopy
 - [x] `bulk_equity_bhavcopy(from_date, to_date)` — multi-day download
+- [x] `pr_bhavcopy(date)` — fixed: 2-digit year (`%d%m%y`) + `pr/` subdirectory in path
+- [x] `cm_mii_security_report(date)` → renamed to `full_bhavcopy_delivery(date)` — fixed base path to `products/content/`
+- [x] `full_bhavcopy_delivery(date)` — OHLCV + delivery % (3543 rows, cloud-safe)
+- [x] `pe_ratio(date)` — P/E ratios for all listed stocks (~2262 rows)
+- [x] `week52_high_low(date)` — 52-week adjusted H/L for all stocks (~5946 rows)
+- [x] `short_selling(date)` — broker-reported short selling positions
+- [x] `surveillance_indicator(date)` — GSM/ASM/IRP flags per stock (~3211 rows)
+- [x] `bulk_deals_archive()` — today's bulk deals, rolling cloud-safe file
+- [x] `block_deals_archive()` — today's block deals, rolling cloud-safe file
 
 ## Health-check agent (healthcheck.py)
 

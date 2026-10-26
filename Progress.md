@@ -4,6 +4,27 @@ Newest entries at top.
 
 ---
 
+## 2026-10-26 (continued)
+
+### Fixed bugs and added 7 equity-research archive methods to downloads.py
+
+**Bugs fixed:**
+- `pr_bhavcopy()`: used wrong date format (`%d%m%Y`) — actual NSE filename uses 2-digit year (`%d%m%y`); also missing `pr/` subdirectory in URL path
+- `cm_mii_security_report()`: used wrong base path (`archives/equities/bhavcopy/`) — actual URL is `products/content/`; renamed method to `full_bhavcopy_delivery()` to reflect actual content (OHLCV + delivery %)
+
+**New methods (all cloud-safe, archive-based):**
+- `full_bhavcopy_delivery(date)` — OHLCV + delivery % for all EQ series stocks (~3543 rows, `products/content/sec_bhavdata_full_DDMMYYYY.csv`)
+- `pe_ratio(date)` — P/E ratios for all listed stocks (~2262 rows, 2-digit year format `peDetail/PE_DDMMYY.csv`)
+- `week52_high_low(date)` — adjusted 52-week H/L for all stocks (~5946 rows, skips 2 disclaimer header rows)
+- `short_selling(date)` — broker-reported short selling positions (`archives/equities/shortSelling/`)
+- `surveillance_indicator(date)` — GSM/ASM/IRP flags per stock (~3211 rows, 2-digit year `content/cm/REG_INDDDMMYY.csv`)
+- `bulk_deals_archive()` — today's bulk deals, rolling cloud-safe file (`content/equities/bulk.csv`)
+- `block_deals_archive()` — today's block deals, rolling cloud-safe file (`content/equities/block.csv`)
+
+Added `_ddmmyy()` helper for 2-digit year format. Added `_parse_csv_url()` internal helper to fetch+parse CSV in one call (no file written to disk). Replaced hardcoded archive URL strings with `_ARCHIVE` constant throughout.
+
+---
+
 ## 2026-10-26
 
 ### Added `board_meeting_detail(xml_url)` to corporate.py
