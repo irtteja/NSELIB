@@ -45,7 +45,8 @@ class DownloadsMixin:
         dt = dt or (date.today() - timedelta(days=1))
         filename = f"BhavCopy_NSE_CM_0_0_0_{dt.strftime('%Y%m%d')}_F_0000.csv.zip"
         url = f"https://nsearchives.nseindia.com/content/cm/{filename}"
-        return self._session.download_zip(url, folder=Path(folder))
+        _dl = lambda u: self._session.download_zip(u, folder=Path(folder))
+        return self._guardian.guarded_archive(url, _dl) if self._guardian else _dl(url)
 
     def delivery_bhavcopy(
         self,
@@ -56,7 +57,8 @@ class DownloadsMixin:
         dt = dt or (date.today() - timedelta(days=1))
         filename = f"MTO_{_ddmmyyyy(dt)}.DAT"
         url = f"https://nsearchives.nseindia.com/archives/equities/mto/{filename}"
-        return self._session.download_file(url, folder=Path(folder), filename=filename)
+        _dl = lambda u: self._session.download_file(u, folder=Path(folder), filename=filename)
+        return self._guardian.guarded_archive(url, _dl) if self._guardian else _dl(url)
 
     def fno_bhavcopy(
         self,
@@ -67,7 +69,8 @@ class DownloadsMixin:
         dt = dt or (date.today() - timedelta(days=1))
         filename = f"BhavCopy_NSE_FO_0_0_0_{dt.strftime('%Y%m%d')}_F_0000.csv.zip"
         url = f"https://nsearchives.nseindia.com/content/fo/{filename}"
-        return self._session.download_zip(url, folder=Path(folder))
+        _dl = lambda u: self._session.download_zip(u, folder=Path(folder))
+        return self._guardian.guarded_archive(url, _dl) if self._guardian else _dl(url)
 
     def indices_bhavcopy(
         self,
@@ -78,7 +81,8 @@ class DownloadsMixin:
         dt = dt or (date.today() - timedelta(days=1))
         filename = f"ind_close_all_{_ddmmyyyy(dt)}.csv"
         url = f"https://nsearchives.nseindia.com/content/indices/{filename}"
-        return self._session.download_file(url, folder=Path(folder), filename=filename)
+        _dl = lambda u: self._session.download_file(u, folder=Path(folder), filename=filename)
+        return self._guardian.guarded_archive(url, _dl) if self._guardian else _dl(url)
 
     def pr_bhavcopy(
         self,
@@ -89,7 +93,8 @@ class DownloadsMixin:
         dt = dt or (date.today() - timedelta(days=1))
         filename = f"PR{_ddmmyyyy(dt)}.zip"
         url = f"https://nsearchives.nseindia.com/archives/equities/bhavcopy/{filename}"
-        return self._session.download_zip(url, folder=Path(folder))
+        _dl = lambda u: self._session.download_zip(u, folder=Path(folder))
+        return self._guardian.guarded_archive(url, _dl) if self._guardian else _dl(url)
 
     # ------------------------------------------------------------------ #
     #  Bhavcopy — bulk range                                              #
@@ -146,7 +151,8 @@ class DownloadsMixin:
         dt = dt or (date.today() - timedelta(days=1))
         filename = f"MW{_ddmmyyyy(dt)}.zip"
         url = f"https://nsearchives.nseindia.com/archives/equities/bhavcopy/{filename}"
-        return self._session.download_zip(url, folder=Path(folder))
+        _dl = lambda u: self._session.download_zip(u, folder=Path(folder))
+        return self._guardian.guarded_archive(url, _dl) if self._guardian else _dl(url)
 
     def cm_mii_security_report(
         self,
@@ -157,7 +163,8 @@ class DownloadsMixin:
         dt = dt or (date.today() - timedelta(days=1))
         filename = f"sec_bhavdata_full_{_ddmmyyyy(dt)}.csv"
         url = f"https://nsearchives.nseindia.com/archives/equities/bhavcopy/{filename}"
-        return self._session.download_file(url, folder=Path(folder), filename=filename)
+        _dl = lambda u: self._session.download_file(u, folder=Path(folder), filename=filename)
+        return self._guardian.guarded_archive(url, _dl) if self._guardian else _dl(url)
 
     # ------------------------------------------------------------------ #
     #  Reports metadata & document download                               #

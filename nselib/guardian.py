@@ -222,6 +222,112 @@ class Guardian:
             return True
         return False
 
+    # ------------------------------------------------------------------ #
+    #  Archive heal — guarded_archive + URL-pattern repair                #
+    # ------------------------------------------------------------------ #
+
+    def guarded_archive(
+        self,
+        url:    str,
+        action: "Any | None" = None,
+    ) -> Any:
+        """
+        Execute action(url) — an archive request against nsearchives.nseindia.com.
+
+        On NSEFileUnavailableError (404), asks Brain to infer the new URL pattern,
+        patches the calling method's source code, and retries with the corrected URL.
+
+        action: any callable(str) -> Any.
+                Defaults to self._session.get_raw (returns raw Response).
+                Pass self._session.download_zip / download_file / download_gz
+                when the caller needs a different download helper.
+
+        Usage in archive methods::
+
+            _dl = lambda u: self._session.download_zip(u, folder=Path(folder))
+            return self._guardian.guarded_archive(url, _dl) if self._guardian else _dl(url)
+        """
+        import inspect
+        caller = inspect.stack()[1]
+        _action = action if action is not None else self._session.get_raw
+        try:
+            return _action(url)
+        except NSEFileUnavailableError:
+            new_url = self._heal_archive_url(url, caller.filename, caller.function)
+            return _action(new_url)
+
+    def _heal_archive_url(
+        self, url: str, caller_file: str, caller_name: str
+    ) -> str:
+        """Ask Brain to fix a broken archive URL and patch the source."""
+        print(
+            f"[Guardian] Archive 404 in {Path(caller_file).name}/{caller_name} "
+            "— asking Claude to fix URL pattern…"
+        )
+        source = self._extract_method_source(caller_file, caller_name)
+        prompt = (
+            f"An NSE archive file returned 404 (file not found).\n"
+            f"  URL: {url}\n"
+            f"  Method: {caller_name} in {Path(caller_file).name}\n\n"
+            f"Method source:\n{source}\n\n"
+            f"NSE occasionally changes archive paths or filename formats "
+            f"(e.g. folder rename, added prefix/suffix, date-format change).\n"
+            f"Suggest the corrected URL for this specific request, and if the "
+            f"URL construction pattern has changed provide the full corrected "
+            f"method code so the pattern is fixed for all future calls.\n\n"
+            f"Reply ONLY with JSON:\n"
+            f'{{"new_url": "corrected-url-or-null", '
+            f'"fixed_code": "corrected-method-or-null", '
+            f'"explanation": "one sentence"}}'
+        )
+        fix_raw = self._brain.ask(prompt)
+        fix     = self._parse_json(fix_raw) or {}
+        new_url = fix.get("new_url", "")
+
+        if fix.get("fixed_code") and source:
+            self._patch_method_source(caller_file, source, fix["fixed_code"])
+
+        if new_url:
+            print(f"[Guardian] Archive URL healed: {fix.get('explanation', '')}")
+            self._log(
+                "heal_archive",
+                url=url, new_url=new_url,
+                method=caller_name,
+                explanation=fix.get("explanation", ""),
+            )
+            return new_url
+
+        raise NSEFileUnavailableError(url)
+
+    def _extract_method_source(self, filepath: str, method_name: str) -> str:
+        """Return the source of a method from a file, or '' on failure."""
+        try:
+            text = Path(filepath).read_text()
+            m = re.search(
+                rf"(    def {re.escape(method_name)}\b.*?)(?=\n    def |\Z)",
+                text, re.DOTALL,
+            )
+            return m.group(1) if m else ""
+        except Exception:
+            return ""
+
+    def _patch_method_source(
+        self, filepath: str, old_source: str, new_code: str
+    ) -> None:
+        """Replace a method's source in-place."""
+        try:
+            text = Path(filepath).read_text()
+            old  = old_source.rstrip()
+            new  = "    " + new_code.strip().replace("\n", "\n    ")
+            updated = text.replace(old, new, 1)
+            if updated != text:
+                Path(filepath).write_text(updated)
+                print(f"[Guardian] Patched archive method in {Path(filepath).name}")
+                self._log("patch_archive", filepath=filepath,
+                          snippet=old_source[:80])
+        except Exception as e:
+            print(f"[Guardian] Could not patch archive source: {e}")
+
     def _heal(self, path: str, params: dict | None, bad_resp: Any) -> Any:
         print(f"[Guardian] '{path}' returned empty/error — asking Claude to diagnose…")
 
