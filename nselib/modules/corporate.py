@@ -341,7 +341,7 @@ class CorporateMixin:
     def financial_results_detail(
         self,
         symbol:      str,
-        consolidated: bool = True,
+        consolidated: bool | None = None,
     ) -> list[dict]:
         """
         Structured quarterly P&L for a stock, parsed from NSE Integrated Filing XBRL.
@@ -353,6 +353,8 @@ class CorporateMixin:
           ebit, pbt, tax, pat,
           eps_basic, eps_diluted
 
+        consolidated=None (default): auto-detect — prefers Consolidated, falls back to Standalone.
+        consolidated=True: Consolidated only. consolidated=False: Standalone only.
         Covers FY27 and onwards (integrated-filing-results endpoint).
         For older data use financial_results() + xbrl field.
         """
@@ -362,7 +364,16 @@ class CorporateMixin:
         )
         filings = resp.get("data", []) if isinstance(resp, dict) else resp
 
-        nature = "Consolidated" if consolidated else "Standalone"
+        if consolidated is None:
+            available = {
+                f.get("consolidated", "").strip()
+                for f in filings
+                if f.get("type") == "Integrated Filing- Financials"
+            }
+            nature = "Consolidated" if "Consolidated" in available else "Standalone"
+        else:
+            nature = "Consolidated" if consolidated else "Standalone"
+
         results = []
 
         for filing in filings:
