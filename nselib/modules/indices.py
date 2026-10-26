@@ -155,6 +155,90 @@ class IndicesMixin:
         return data.get("data", {}).get("data", [])
 
     # ------------------------------------------------------------------ #
+    #  Index universe                                                      #
+    # ------------------------------------------------------------------ #
+
+    _UNIVERSE_CACHE = Path.home() / ".nselib" / "index_universe.json"
+    _UNIVERSE_TTL_DAYS = 7
+
+    # Indices to skip — debt, Shariah, SME, leverage/inverse products
+    _UNIVERSE_SKIP = {
+        "G-SEC", "BOND", "SHARIAH", "SME EMERGE", "BHARAT BOND",
+        "COMPOSITE G-SEC", "BENCHMARK G-SEC", "CLEAN PRICE",
+        "8-13 YR", "4-8 YR", "10 YR", "11-15 YR", "15 YR AND ABOVE",
+        "2X LEVERAGE", "1X INVERSE", "DIVIDEND POINTS", "USD",
+    }
+
+    def get_index_universe(self, refresh: bool = False) -> list[dict]:
+        """
+        Return all EQ stocks covered by at least one NSE equity index.
+
+        Each entry:
+            {
+                "symbol":  "RELIANCE",
+                "indices": ["NIFTY 50", "NIFTY 100", "NIFTY 500", ...],
+                "index_count": 12,
+            }
+
+        Results are cached at ~/.nselib/index_universe.json and refreshed
+        automatically every 7 days (index rebalances are quarterly).
+        Pass refresh=True to force an immediate refresh.
+        """
+        cache = self._UNIVERSE_CACHE
+
+        if not refresh and cache.exists():
+            age_days = (date.today() - date.fromisoformat(
+                json.loads(cache.read_text())["last_updated"]
+            )).days
+            if age_days < self._UNIVERSE_TTL_DAYS:
+                return json.loads(cache.read_text())["universe"]
+
+        # --- build fresh universe ---
+        all_indices = [
+            i["index"] for i in self.list_indices().get("data", [])
+        ]
+
+        # filter to equity indices only
+        def _is_equity(name: str) -> bool:
+            n = name.upper()
+            return not any(kw in n for kw in self._UNIVERSE_SKIP)
+
+        equity_indices = [i for i in all_indices if _is_equity(i)]
+
+        # symbol → set of indices
+        symbol_indices: dict[str, set] = {}
+        failed = []
+        for idx in equity_indices:
+            try:
+                rows = self.index_constituents(idx)
+                for r in rows:
+                    sym = r.get("symbol", "")
+                    if sym and r.get("series") == "EQ":
+                        symbol_indices.setdefault(sym, set()).add(idx)
+            except Exception as e:
+                failed.append({"index": idx, "error": str(e)})
+
+        universe = [
+            {
+                "symbol": sym,
+                "indices": sorted(idxs),
+                "index_count": len(idxs),
+            }
+            for sym, idxs in sorted(symbol_indices.items())
+        ]
+
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        cache.write_text(json.dumps({
+            "last_updated": date.today().isoformat(),
+            "total": len(universe),
+            "indices_scanned": len(equity_indices),
+            "failed": failed,
+            "universe": universe,
+        }, indent=2))
+
+        return universe
+
+    # ------------------------------------------------------------------ #
     #  Constituent tracking                                               #
     # ------------------------------------------------------------------ #
 
