@@ -230,6 +230,123 @@ class DownloadsMixin:
         url = f"{_ARCHIVE}/content/cm/REG_IND{_ddmmyy(dt)}.csv"
         return _parse_csv_url(self._session, url)
 
+    def daily_volatility(self, dt: date | None = None) -> list[dict]:
+        """
+        Daily and annualised volatility for all NSE-listed stocks.
+        Computed using EWMA (lambda=0.995) on log returns.
+
+        Returns list of dicts:
+          symbol, close, prev_close, log_return,
+          prev_daily_vol, current_daily_vol, annualised_vol
+        ~5104 rows per day.
+        dt defaults to today (published intraday).
+        """
+        dt = dt or date.today()
+        url = f"{_ARCHIVE}/archives/nsccl/volt/CMVOLT_{_ddmmyyyy(dt)}.CSV"
+        r = self._session._s.get(url, timeout=15)
+        r.raise_for_status()
+        reader = _csv.DictReader(_io.StringIO(r.text))
+        out = []
+        for row in reader:
+            try:
+                out.append({
+                    "symbol":           (row.get("Symbol") or "").strip(),
+                    "close":            float(row.get("Underlying Close Price (A)") or 0),
+                    "prev_close":       float(row.get("Underlying Previous Day Close Price (B)") or 0),
+                    "log_return":       float(row.get("Underlying Log Returns (C) = LN(A/B)") or 0),
+                    "prev_daily_vol":   float(row.get("Previous Day Underlying Volatility (D)") or 0),
+                    "current_daily_vol":float(row.get("Current Day Underlying Daily Volatility (E) = Sqrt(0.995*D*D + 0.005*C*C)") or 0),
+                    "annualised_vol":   float(row.get("Underlying Annualised Volatility (F) = E*Sqrt(365)") or 0),
+                })
+            except (ValueError, KeyError):
+                continue
+        return out
+
+    def priceband_changes(self, dt: date | None = None) -> list[dict]:
+        """
+        Price band changes effective from the next trading date.
+        Returns list of dicts: symbol, series, security_name, from_band, to_band
+        dt defaults to today.
+        """
+        dt = dt or date.today()
+        url = f"{_ARCHIVE}/content/equities/eq_band_changes_{_ddmmyyyy(dt)}.csv"
+        r = self._session._s.get(url, timeout=15)
+        r.raise_for_status()
+        reader = _csv.DictReader(_io.StringIO(r.text))
+        out = []
+        for row in reader:
+            sym = (row.get("Symbol") or "").strip()
+            if not sym:
+                continue
+            out.append({
+                "symbol":        sym,
+                "series":        (row.get("Series") or "").strip(),
+                "security_name": (row.get("Security Name") or "").strip(),
+                "from_band":     (row.get("From") or "").strip(),
+                "to_band":       (row.get("To") or "").strip(),
+            })
+        return out
+
+    def sme_bhavcopy(self, dt: date | None = None) -> list[dict]:
+        """
+        SME (Small & Medium Enterprises) segment daily bhavcopy.
+        Returns list of dicts: symbol, series, security, prev_close, open, high,
+                               low, close, traded_value, traded_qty, hi_52wk, lo_52wk
+        ~440 rows per day. dt defaults to most recent available trading day.
+        """
+        base = dt or (date.today() - timedelta(days=1))
+        for offset in range(5):
+            check = base - timedelta(days=offset)
+            url = f"{_ARCHIVE}/archives/sme/bhavcopy/sme{_ddmmyyyy(check)}.csv"
+            try:
+                r = self._session._s.get(url, timeout=15)
+                if r.status_code != 200 or b"DOCTYPE" in r.content[:50]:
+                    continue
+                reader = _csv.DictReader(_io.StringIO(r.text))
+                out = []
+                for row in reader:
+                    sym = (row.get("SYMBOL") or "").strip()
+                    if not sym:
+                        continue
+                    def _f(k, _row=row): return float((_row.get(k) or "0").strip() or 0)
+                    out.append({
+                        "symbol":       sym,
+                        "series":       (row.get("SERIES") or "").strip(),
+                        "security":     (row.get("SECURITY") or "").strip(),
+                        "prev_close":   _f("PREV_CL_PR"),
+                        "open":         _f("OPEN_PRICE"),
+                        "high":         _f("HIGH_PRICE"),
+                        "low":          _f("LOW_PRICE"),
+                        "close":        _f("CLOSE_PRICE"),
+                        "traded_value": _f("NET_TRDVAL"),
+                        "traded_qty":   _f("NET_TRDQTY"),
+                        "hi_52wk":      _f("HI_52_WK"),
+                        "lo_52wk":      _f("LO_52_WK"),
+                    })
+                return out
+            except Exception:
+                continue
+        return []
+
+    def sme_price_band(self, dt: date | None = None) -> list[dict]:
+        """
+        SME segment complete price band list.
+        Returns list of dicts: symbol, series, name, band, remarks
+        dt defaults to most recent available trading day.
+        """
+        base = dt or (date.today() - timedelta(days=1))
+        for offset in range(5):
+            check = base - timedelta(days=offset)
+            url = f"{_ARCHIVE}/sme/content/price_band/archieves/sme_bands_complete_{_ddmmyyyy(check)}.csv"
+            try:
+                r = self._session._s.get(url, timeout=15)
+                if r.status_code == 200 and b"DOCTYPE" not in r.content[:50]:
+                    reader = _csv.DictReader(_io.StringIO(r.text))
+                    return [row for row in reader]
+            except Exception:
+                continue
+        return []
+
     def bulk_deals_archive(self) -> list[dict]:
         """
         Today's bulk deals (rolling file — always reflects the current trading day).

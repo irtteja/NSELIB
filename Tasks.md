@@ -92,6 +92,10 @@ Format: `- [ ]` pending · `- [x]` done · `- [~]` blocked/deferred
 - [x] `bulk_deals_archive()` — today's bulk deals, rolling cloud-safe file
 - [x] `block_deals_archive()` — today's block deals, rolling cloud-safe file
 - [x] `margin_trading_disclosure(date)` — scrip-wise margin financing data + summary (2215 scrips)
+- [x] `daily_volatility(date)` — EWMA daily + annualised volatility for all stocks (~4955 rows)
+- [x] `priceband_changes(date)` — price band changes effective next trading day
+- [x] `sme_bhavcopy(date)` — SME segment daily OHLCV + 52-week H/L (~467 rows)
+- [x] `sme_price_band(date)` — SME segment complete price band list (~583 rows)
 
 ## F&O module additions (fno.py)
 
