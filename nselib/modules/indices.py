@@ -65,11 +65,11 @@ UNIVERSE_INDICES: list[str] = [
     "NIFTY METAL", "NIFTY MEDIA", "NIFTY REALTY", "NIFTY ENERGY",
     "NIFTY OIL AND GAS", "NIFTY HEALTHCARE", "NIFTY CONSR DURBL", "NIFTY CEMENT",
 
-    # Thematic (24)
+    # Thematic (23)
     "NIFTY INFRA", "NIFTY INFRALOG", "NIFTY COMMODITIES", "NIFTY CHEMICALS",
     "NIFTY PSE", "NIFTY CPSE", "NIFTY MNC", "NIFTY MOBILITY",
     "NIFTY HOUSING", "NIFTY COREHOUSING", "NIFTY RURAL", "NIFTY WAVES",
-    "NIFTY IPO", "NIFTY SME EMERGE", "NIFTY EV", "NIFTY IND DEFENCE",
+    "NIFTY IPO", "NIFTY EV", "NIFTY IND DEFENCE",
     "NIFTY IND DIGITAL", "NIFTY IND TOURISM", "NIFTY INDIA MFG",
     "NIFTY INTERNET", "NIFTY RAILWAYSPSU", "NIFTY REITS REALTY",
     "NIFTY CAPITAL MKT", "NIFTY TRANS LOGIS",
@@ -187,36 +187,46 @@ class IndicesMixin:
         cache = self._UNIVERSE_CACHE
 
         if not refresh and cache.exists():
-            age_days = (date.today() - date.fromisoformat(
-                json.loads(cache.read_text())["last_updated"]
-            )).days
+            cached = json.loads(cache.read_text())
+            age_days = (date.today() - date.fromisoformat(cached["last_updated"])).days
             if age_days < self._UNIVERSE_TTL_DAYS:
-                return json.loads(cache.read_text())["universe"]
+                return cached["universe"]
 
         # --- build fresh universe ---
-        all_indices = [
-            i["index"] for i in self.list_indices().get("data", [])
-        ]
+        # Call list_indices() exactly once; build {indexSymbol: displayName} map.
+        all_indices_data = self.list_indices().get("data", [])
 
-        # filter to equity indices only
         def _is_equity(name: str) -> bool:
             n = name.upper()
             return not any(kw in n for kw in self._UNIVERSE_SKIP)
 
-        equity_indices = [i for i in all_indices if _is_equity(i)]
+        # {indexSymbol: displayName} for equity indices only
+        equity_index_map: dict[str, str] = {}
+        for item in all_indices_data:
+            name = item.get("index", "")
+            sym  = item.get("indexSymbol", "")
+            if name and sym and _is_equity(name):
+                equity_index_map[sym] = name
 
-        # symbol → set of indices
+        # symbol → set of index display names
         symbol_indices: dict[str, set] = {}
         failed = []
-        for idx in equity_indices:
+        for idx_sym, idx_name in equity_index_map.items():
             try:
-                rows = self.index_constituents(idx)
+                # Inline URL construction — bypasses _resolve_index_symbol()
+                # so list_indices() is NOT called again per index.
+                url = (
+                    "https://www.nseindia.com/api/NextApi/apiClient/marketWatchApi"
+                    f"?functionName=getIndicesData&symbol={quote(idx_sym)}"
+                )
+                resp = self._session.get_raw(url)
+                rows = resp.json().get("data", {}).get("data", [])
                 for r in rows:
                     sym = r.get("symbol", "")
-                    if sym and r.get("series") == "EQ":
-                        symbol_indices.setdefault(sym, set()).add(idx)
+                    if sym and sym != idx_sym:  # first row is the index itself
+                        symbol_indices.setdefault(sym, set()).add(idx_name)
             except Exception as e:
-                failed.append({"index": idx, "error": str(e)})
+                failed.append({"index": idx_name, "error": str(e)})
 
         universe = [
             {
@@ -231,7 +241,7 @@ class IndicesMixin:
         cache.write_text(json.dumps({
             "last_updated": date.today().isoformat(),
             "total": len(universe),
-            "indices_scanned": len(equity_indices),
+            "indices_scanned": len(equity_index_map),
             "failed": failed,
             "universe": universe,
         }, indent=2))

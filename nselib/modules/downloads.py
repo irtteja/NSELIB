@@ -23,15 +23,44 @@ def _monYYYY(d: date) -> str:
     return d.strftime("%b%Y").upper()
 
 
+def _prev_trading_day(d: date) -> date:
+    """Return d if it is a weekday, else the most recent prior weekday."""
+    while d.weekday() >= 5:
+        d -= timedelta(days=1)
+    return d
+
+
 def _trading_days(from_date: date, to_date: date) -> list[date]:
     """Yield weekdays in [from_date, to_date]. Holiday filtering is best-effort."""
     out = []
     cur = from_date
     while cur <= to_date:
-        if cur.weekday() < 5:   # Mon–Fri
+        if cur.weekday() < 5:
             out.append(cur)
         cur += timedelta(days=1)
     return out
+
+
+def _find_recent_file(session, url_fn, base: date, max_days: int = 5):
+    """Try url_fn(date) for up to max_days weekdays starting at base, going back.
+
+    Returns (response, found_date) where response.status_code == 200.
+    Raises FileNotFoundError if no file is found.
+    """
+    checked = 0
+    check = base
+    while checked < max_days:
+        if check.weekday() < 5:
+            url = url_fn(check)
+            try:
+                r = session._s.get(url, timeout=15)
+                if r.status_code == 200 and b"DOCTYPE" not in r.content[:50]:
+                    return r, check
+            except Exception:
+                pass
+            checked += 1
+        check -= timedelta(days=1)
+    raise FileNotFoundError(f"No file found within {max_days} trading days of {base}")
 
 
 def _parse_csv_url(session, url: str) -> list[dict]:
@@ -62,27 +91,20 @@ class DownloadsMixin:
             Returns the saved file path.
             """
             dt = dt or (date.today() - timedelta(days=1))
-    
-            def _prev_weekday(d):
-                d -= timedelta(days=1)
-                while d.weekday() >= 5:
-                    d -= timedelta(days=1)
-                return d
-    
-            while dt.weekday() >= 5:
-                dt -= timedelta(days=1)
-    
+            dt = _prev_trading_day(dt)
+
             def _dl(first_url):
                 d, last_err = dt, None
                 for _ in range(8):
+                    d = _prev_trading_day(d)
                     filename = f"BhavCopy_NSE_CM_0_0_0_{d.strftime('%Y%m%d')}_F_0000.csv.zip"
                     try:
                         return self._session.download_zip(f"{_ARCHIVE}/content/cm/{filename}", folder=Path(folder))
                     except Exception as e:
                         last_err = e
-                        d = _prev_weekday(d)
+                        d -= timedelta(days=1)
                 raise last_err
-    
+
             filename = f"BhavCopy_NSE_CM_0_0_0_{dt.strftime('%Y%m%d')}_F_0000.csv.zip"
             url = f"{_ARCHIVE}/content/cm/{filename}"
             return self._guardian.guarded_archive(url, _dl) if self._guardian else _dl(url)
@@ -94,10 +116,8 @@ class DownloadsMixin:
         ) -> Path:
             """Delivery position bhavcopy (MTO/delivery data)."""
             dt = dt or (date.today() - timedelta(days=1))
-            # NSE publishes no file on weekends or exchange holidays; roll back to the last day with a file
             for _ in range(10):
-                while dt.weekday() >= 5:
-                    dt -= timedelta(days=1)
+                dt = _prev_trading_day(dt)
                 filename = f"MTO_{_ddmmyyyy(dt)}.DAT"
                 url = f"{_ARCHIVE}/archives/equities/mto/{filename}"
                 probe = self._session._s.get(url, stream=True)
@@ -116,10 +136,7 @@ class DownloadsMixin:
             folder: str | Path  = ".",
         ) -> Path:
             """F&O bhavcopy CSV."""
-            dt = dt or (date.today() - timedelta(days=1))
-            # NSE publishes no bhavcopy on weekends; step back to the last weekday
-            while dt.weekday() >= 5:
-                dt -= timedelta(days=1)
+            dt = _prev_trading_day(dt or (date.today() - timedelta(days=1)))
             filename = f"BhavCopy_NSE_FO_0_0_0_{dt.strftime('%Y%m%d')}_F_0000.csv.zip"
             url = f"{_ARCHIVE}/content/fo/{filename}"
             _dl = lambda u: self._session.download_zip(u, folder=Path(folder))
@@ -130,10 +147,8 @@ class DownloadsMixin:
             dt:     date | None = None,
             folder: str | Path  = ".",
         ) -> Path:
-            """Index daily values bhavcopy CSV."""
-            dt = dt or (date.today() - timedelta(days=1))
-            while dt.weekday() >= 5:
-                dt -= timedelta(days=1)
+            """Index daily values bhavcopy CSV (146 indices, OHLCV + PE/PB/DivYield)."""
+            dt = _prev_trading_day(dt or (date.today() - timedelta(days=1)))
             filename = f"ind_close_all_{_ddmmyyyy(dt)}.csv"
             url = f"{_ARCHIVE}/content/indices/{filename}"
             _dl = lambda u: self._session.download_file(u, folder=Path(folder), filename=filename)
@@ -158,9 +173,7 @@ class DownloadsMixin:
           top_by_value    – list[dict]: top 25 securities by traded value
         """
         import zipfile as _zf
-        dt = dt or (date.today() - timedelta(days=1))
-        while dt.weekday() >= 5:
-            dt -= timedelta(days=1)
+        dt = _prev_trading_day(dt or (date.today() - timedelta(days=1)))
 
         url = f"{_ARCHIVE}/archives/equities/bhavcopy/pr/PR{_ddmmyy(dt)}.zip"
         r = (self._guardian.guarded_archive(url, lambda u: self._session._s.get(u, timeout=30))
@@ -224,7 +237,7 @@ class DownloadsMixin:
                             "date": bm_date, "purpose": purpose})
             return out
 
-        # --- gainers/losers — skip section-header rows (empty GAIN_LOSS + SECURITY is a label) ---
+        # --- gainers/losers — skip section-header rows ---
         def _parse_gl(rows):
             return [r for r in rows
                     if r.get("GAIN_LOSS", "").strip() in ("G", "L")]
@@ -340,21 +353,14 @@ class DownloadsMixin:
         dt defaults to yesterday.
         """
         dt = dt or (date.today() - timedelta(days=1))
-        for i in range(5):
-            check = dt - timedelta(days=i)
-            if check.weekday() >= 5:
-                continue
-            url = f"{_ARCHIVE}/content/CM_52_wk_High_low_{_ddmmyyyy(check)}.csv"
-            r = self._session._s.get(url, timeout=15)
-            if r.status_code == 404 or (len(r.content) > 10 and b"DOCTYPE" in r.content[:200]):
-                continue
-            r.raise_for_status()
-            lines = r.text.splitlines()
-            # First 2 lines are disclaimer text, not CSV header
-            data_text = "\n".join(lines[2:])
-            reader = _csv.DictReader(_io.StringIO(data_text))
-            return [row for row in reader]
-        raise FileNotFoundError("No 52-week high/low file found in the last 5 trading days")
+        r, _ = _find_recent_file(
+            self._session,
+            lambda d: f"{_ARCHIVE}/content/CM_52_wk_High_low_{_ddmmyyyy(d)}.csv",
+            dt,
+        )
+        lines = r.text.splitlines()
+        data_text = "\n".join(lines[2:])  # first 2 lines are disclaimer text
+        return list(_csv.DictReader(_io.StringIO(data_text)))
 
     def short_selling(self, dt: date | None = None) -> list[dict]:
         """
@@ -364,18 +370,12 @@ class DownloadsMixin:
         dt defaults to yesterday.
         """
         dt = dt or (date.today() - timedelta(days=1))
-        for i in range(5):
-            check = dt - timedelta(days=i)
-            if check.weekday() >= 5:
-                continue
-            url = f"{_ARCHIVE}/archives/equities/shortSelling/shortselling_{_ddmmyyyy(check)}.csv"
-            r = self._session._s.get(url, timeout=15)
-            if r.status_code == 404 or (len(r.content) > 10 and b"DOCTYPE" in r.content[:200]):
-                continue
-            r.raise_for_status()
-            reader = _csv.DictReader(_io.StringIO(r.text))
-            return [row for row in reader]
-        raise FileNotFoundError("No short selling file found in the last 5 trading days")
+        r, _ = _find_recent_file(
+            self._session,
+            lambda d: f"{_ARCHIVE}/archives/equities/shortSelling/shortselling_{_ddmmyyyy(d)}.csv",
+            dt,
+        )
+        return list(_csv.DictReader(_io.StringIO(r.text)))
 
     def surveillance_indicator(self, dt: date | None = None) -> list[dict]:
         """
@@ -387,18 +387,12 @@ class DownloadsMixin:
         dt defaults to yesterday.
         """
         dt = dt or (date.today() - timedelta(days=1))
-        for i in range(5):
-            check = dt - timedelta(days=i)
-            if check.weekday() >= 5:
-                continue
-            url = f"{_ARCHIVE}/content/cm/REG_IND{_ddmmyy(check)}.csv"
-            r = self._session._s.get(url, timeout=15)
-            if r.status_code == 404 or (len(r.content) > 10 and b"DOCTYPE" in r.content[:200]):
-                continue
-            r.raise_for_status()
-            reader = _csv.DictReader(_io.StringIO(r.text))
-            return [row for row in reader]
-        raise FileNotFoundError("No surveillance indicator file found in the last 5 trading days")
+        r, _ = _find_recent_file(
+            self._session,
+            lambda d: f"{_ARCHIVE}/content/cm/REG_IND{_ddmmyy(d)}.csv",
+            dt,
+        )
+        return list(_csv.DictReader(_io.StringIO(r.text)))
 
     def daily_volatility(self, dt: date | None = None) -> list[dict]:
         """
@@ -440,22 +434,13 @@ class DownloadsMixin:
         Returns: [{symbol, series, security_name, band, remarks}]
         """
         base = dt or (date.today() - timedelta(days=1))
-        r = None
-        for offset in range(5):
-            check = base - timedelta(days=offset)
-            url = f"{_ARCHIVE}/content/equities/sec_list_{_ddmmyyyy(check)}.csv"
-            try:
-                resp = self._session._s.get(url, timeout=15)
-                if resp.status_code == 200 and b"DOCTYPE" not in resp.content[:50]:
-                    r = resp
-                    break
-            except Exception:
-                continue
-        if not r:
-            raise FileNotFoundError(f"securities_list: no file found near {base}")
-        reader = _csv.DictReader(_io.StringIO(r.text))
+        r, _ = _find_recent_file(
+            self._session,
+            lambda d: f"{_ARCHIVE}/content/equities/sec_list_{_ddmmyyyy(d)}.csv",
+            base,
+        )
         out = []
-        for row in reader:
+        for row in _csv.DictReader(_io.StringIO(r.text)):
             sym = (row.get("Symbol") or "").strip()
             if not sym:
                 continue
@@ -478,9 +463,8 @@ class DownloadsMixin:
         url = f"{_ARCHIVE}/content/equities/eq_band_changes_{_ddmmyyyy(dt)}.csv"
         r = self._session._s.get(url, timeout=15)
         r.raise_for_status()
-        reader = _csv.DictReader(_io.StringIO(r.text))
         out = []
-        for row in reader:
+        for row in _csv.DictReader(_io.StringIO(r.text)):
             sym = (row.get("Symbol") or "").strip()
             if not sym:
                 continue
@@ -501,38 +485,35 @@ class DownloadsMixin:
         ~440 rows per day. dt defaults to most recent available trading day.
         """
         base = dt or (date.today() - timedelta(days=1))
-        for offset in range(5):
-            check = base - timedelta(days=offset)
-            url = f"{_ARCHIVE}/archives/sme/bhavcopy/sme{_ddmmyyyy(check)}.csv"
-            try:
-                r = self._session._s.get(url, timeout=15)
-                if r.status_code != 200 or b"DOCTYPE" in r.content[:50]:
-                    continue
-                reader = _csv.DictReader(_io.StringIO(r.text))
-                out = []
-                for row in reader:
-                    sym = (row.get("SYMBOL") or "").strip()
-                    if not sym:
-                        continue
-                    def _f(k, _row=row): return float((_row.get(k) or "0").strip() or 0)
-                    out.append({
-                        "symbol":       sym,
-                        "series":       (row.get("SERIES") or "").strip(),
-                        "security":     (row.get("SECURITY") or "").strip(),
-                        "prev_close":   _f("PREV_CL_PR"),
-                        "open":         _f("OPEN_PRICE"),
-                        "high":         _f("HIGH_PRICE"),
-                        "low":          _f("LOW_PRICE"),
-                        "close":        _f("CLOSE_PRICE"),
-                        "traded_value": _f("NET_TRDVAL"),
-                        "traded_qty":   _f("NET_TRDQTY"),
-                        "hi_52wk":      _f("HI_52_WK"),
-                        "lo_52wk":      _f("LO_52_WK"),
-                    })
-                return out
-            except Exception:
+        try:
+            r, _ = _find_recent_file(
+                self._session,
+                lambda d: f"{_ARCHIVE}/archives/sme/bhavcopy/sme{_ddmmyyyy(d)}.csv",
+                base,
+            )
+        except FileNotFoundError:
+            return []
+        out = []
+        for row in _csv.DictReader(_io.StringIO(r.text)):
+            sym = (row.get("SYMBOL") or "").strip()
+            if not sym:
                 continue
-        return []
+            def _f(k, _row=row): return float((_row.get(k) or "0").strip() or 0)
+            out.append({
+                "symbol":       sym,
+                "series":       (row.get("SERIES") or "").strip(),
+                "security":     (row.get("SECURITY") or "").strip(),
+                "prev_close":   _f("PREV_CL_PR"),
+                "open":         _f("OPEN_PRICE"),
+                "high":         _f("HIGH_PRICE"),
+                "low":          _f("LOW_PRICE"),
+                "close":        _f("CLOSE_PRICE"),
+                "traded_value": _f("NET_TRDVAL"),
+                "traded_qty":   _f("NET_TRDQTY"),
+                "hi_52wk":      _f("HI_52_WK"),
+                "lo_52wk":      _f("LO_52_WK"),
+            })
+        return out
 
     def sme_price_band(self, dt: date | None = None) -> list[dict]:
         """
@@ -541,17 +522,15 @@ class DownloadsMixin:
         dt defaults to most recent available trading day.
         """
         base = dt or (date.today() - timedelta(days=1))
-        for offset in range(5):
-            check = base - timedelta(days=offset)
-            url = f"{_ARCHIVE}/sme/content/price_band/archieves/sme_bands_complete_{_ddmmyyyy(check)}.csv"
-            try:
-                r = self._session._s.get(url, timeout=15)
-                if r.status_code == 200 and b"DOCTYPE" not in r.content[:50]:
-                    reader = _csv.DictReader(_io.StringIO(r.text))
-                    return [row for row in reader]
-            except Exception:
-                continue
-        return []
+        try:
+            r, _ = _find_recent_file(
+                self._session,
+                lambda d: f"{_ARCHIVE}/sme/content/price_band/archieves/sme_bands_complete_{_ddmmyyyy(d)}.csv",
+                base,
+            )
+        except FileNotFoundError:
+            return []
+        return list(_csv.DictReader(_io.StringIO(r.text)))
 
     def bulk_deals_archive(self) -> list[dict]:
         """
@@ -604,7 +583,6 @@ class DownloadsMixin:
         lines = raw.splitlines()
         report_date = lines[0].split("Reporting date")[-1].strip().rstrip(",").strip()
 
-        # Summary rows: lines 3-6 have Sr.No., Particulars, Rs. In Lakhs
         summary_keys = [
             "total_outstanding_start",
             "fresh_exposure",
@@ -622,7 +600,6 @@ class DownloadsMixin:
                     pass
                 summary_idx += 1
 
-        # Scrip data: find header row, then read CSV from there
         scrip_start = next(
             (i for i, l in enumerate(lines) if l.startswith("Symbol,")), None
         )
@@ -651,10 +628,6 @@ class DownloadsMixin:
         return {"date": report_date, "summary": summary, "scrips": scrips}
 
     # ------------------------------------------------------------------ #
-    #  Daily reports                                                       #
-    # ------------------------------------------------------------------ #
-
-    # ------------------------------------------------------------------ #
     #  Haircut / VaR / margin files                                       #
     # ------------------------------------------------------------------ #
 
@@ -664,19 +637,11 @@ class DownloadsMixin:
         Returns: [{symbol, isin, valuation_price, haircut}]
         """
         base = dt or (date.today() - timedelta(days=1))
-        r = None
-        for offset in range(5):
-            check = base - timedelta(days=offset)
-            url = f"{_ARCHIVE}/content/equities/APPSEC_COLLVAL_{_ddmmyyyy(check)}.csv"
-            try:
-                resp = self._session._s.get(url, timeout=15)
-                if resp.status_code == 200 and b"DOCTYPE" not in resp.content[:50]:
-                    r = resp
-                    break
-            except Exception:
-                continue
-        if not r:
-            raise FileNotFoundError(f"haircut_approved_securities: no file found near {base}")
+        r, _ = _find_recent_file(
+            self._session,
+            lambda d: f"{_ARCHIVE}/content/equities/APPSEC_COLLVAL_{_ddmmyyyy(d)}.csv",
+            base,
+        )
         out = []
         for line in r.text.splitlines():
             parts = [p.strip() for p in line.split(",")]
@@ -698,22 +663,13 @@ class DownloadsMixin:
         Returns: [{isin, symbol, series, type, haircut, nav}]
         """
         base = dt or (date.today() - timedelta(days=1))
-        r = None
-        for offset in range(5):
-            check = base - timedelta(days=offset)
-            url = f"{_ARCHIVE}/archives/equities/mf_haircut/MF_VAR_{_ddmmyyyy(check)}.csv"
-            try:
-                resp = self._session._s.get(url, timeout=15)
-                if resp.status_code == 200 and b"DOCTYPE" not in resp.content[:50]:
-                    r = resp
-                    break
-            except Exception:
-                continue
-        if not r:
-            raise FileNotFoundError(f"haircut_mutual_funds: no file found near {base}")
-        reader = _csv.DictReader(_io.StringIO(r.text))
+        r, _ = _find_recent_file(
+            self._session,
+            lambda d: f"{_ARCHIVE}/archives/equities/mf_haircut/MF_VAR_{_ddmmyyyy(d)}.csv",
+            base,
+        )
         out = []
-        for row in reader:
+        for row in _csv.DictReader(_io.StringIO(r.text)):
             try:
                 out.append({
                     "isin":    (row.get("ISIN") or "").strip(),
@@ -733,22 +689,13 @@ class DownloadsMixin:
         Returns: [{symbol, isin, valuation_price, haircut}]
         """
         base = dt or (date.today() - timedelta(days=1))
-        r = None
-        for offset in range(5):
-            check = base - timedelta(days=offset)
-            url = f"{_ARCHIVE}/content/equities/APPSEC_ALL_{_ddmmyyyy(check)}.CSV"
-            try:
-                resp = self._session._s.get(url, timeout=15)
-                if resp.status_code == 200 and b"DOCTYPE" not in resp.content[:50]:
-                    r = resp
-                    break
-            except Exception:
-                continue
-        if not r:
-            raise FileNotFoundError(f"haircut_all_approved: no file found near {base}")
-        reader = _csv.DictReader(_io.StringIO(r.text))
+        r, _ = _find_recent_file(
+            self._session,
+            lambda d: f"{_ARCHIVE}/content/equities/APPSEC_ALL_{_ddmmyyyy(d)}.CSV",
+            base,
+        )
         out = []
-        for row in reader:
+        for row in _csv.DictReader(_io.StringIO(r.text)):
             sym = (row.get("Symbol") or "").strip()
             if not sym:
                 continue
@@ -773,19 +720,11 @@ class DownloadsMixin:
         """
         base = dt or (date.today() - timedelta(days=1))
         # Find the most recent trading day that has VaR files
-        found_dt = None
-        for offset in range(5):
-            check = base - timedelta(days=offset)
-            test_url = f"{_ARCHIVE}/archives/nsccl/var/C_VAR1_{_ddmmyyyy(check)}_1.DAT"
-            try:
-                resp = self._session._s.get(test_url, timeout=15)
-                if resp.status_code == 200 and b"DOCTYPE" not in resp.content[:50]:
-                    found_dt = check
-                    break
-            except Exception:
-                continue
-        if not found_dt:
-            raise FileNotFoundError(f"var_files: no files found near {base}")
+        r_probe, found_dt = _find_recent_file(
+            self._session,
+            lambda d: f"{_ARCHIVE}/archives/nsccl/var/C_VAR1_{_ddmmyyyy(d)}_1.DAT",
+            base,
+        )
         out = []
         for snap in range(1, 7):
             url = f"{_ARCHIVE}/archives/nsccl/var/C_VAR1_{_ddmmyyyy(found_dt)}_{snap}.DAT"
@@ -826,26 +765,17 @@ class DownloadsMixin:
                    traded_value, traded_qty, trades, hi_52wk, lo_52wk}]
         """
         base = dt or (date.today() - timedelta(days=1))
-        r = None
-        for offset in range(5):
-            check = base - timedelta(days=offset)
-            url = f"{_ARCHIVE}/archives/equities/corpbond/corpbond{_ddmmyyyy(check)}.csv"
-            try:
-                resp = self._session._s.get(url, timeout=15)
-                if resp.status_code == 200 and b"DOCTYPE" not in resp.content[:50]:
-                    r = resp
-                    break
-            except Exception:
-                continue
-        if not r:
-            raise FileNotFoundError(f"corporate_bonds_traded: no file found near {base}")
-        rows = list(_csv.DictReader(_io.StringIO(r.text)))
+        r, _ = _find_recent_file(
+            self._session,
+            lambda d: f"{_ARCHIVE}/archives/equities/corpbond/corpbond{_ddmmyyyy(d)}.csv",
+            base,
+        )
         out = []
-        for row in rows:
+        for row in _csv.DictReader(_io.StringIO(r.text)):
             sym = (row.get("SYMBOL") or "").strip()
             if not sym:
                 continue
-            def _f(k): return float((row.get(k) or "0").strip().replace(",", "") or 0)
+            def _f(k, _row=row): return float((_row.get(k) or "0").strip().replace(",", "") or 0)
             out.append({
                 "symbol":       sym,
                 "security":     (row.get("SECURITY") or "").strip(),
@@ -870,21 +800,11 @@ class DownloadsMixin:
                   market_cap_cr, text (raw narrative)}
         """
         base = dt or (date.today() - timedelta(days=1))
-        r = None
-        found_dt = base
-        for offset in range(5):
-            check = base - timedelta(days=offset)
-            url = f"{_ARCHIVE}/archives/equities/mkt/MA{_ddmmyy(check)}.csv"
-            try:
-                resp = self._session._s.get(url, timeout=15)
-                if resp.status_code == 200 and b"DOCTYPE" not in resp.content[:50]:
-                    r = resp
-                    found_dt = check
-                    break
-            except Exception:
-                continue
-        if not r:
-            raise FileNotFoundError(f"market_activity_report: no file found near {base}")
+        r, found_dt = _find_recent_file(
+            self._session,
+            lambda d: f"{_ARCHIVE}/archives/equities/mkt/MA{_ddmmyy(d)}.csv",
+            base,
+        )
         text = r.text
 
         def _extract(label: str) -> str | None:
@@ -934,14 +854,13 @@ class DownloadsMixin:
     def auction_securities(self, dt: date | None = None) -> dict:
         """List of securities confirmed for auction on the given date.
 
-        NSE filename contains the settlement number (e.g. AUB_2026200_26102026.csv);
-        this method queries the daily-reports API to find the correct URL.
+        NOTE: Uses www.nseindia.in/api/daily-reports — blocked from cloud/datacenter IPs.
+        Will raise an exception when called from a cloud environment.
 
         Returns: {settlement_ref, auction_date, securities: [{symbol, series, total_qty}]}
         """
         import re
         dt = dt or date.today()
-        # Find the file URL via the daily-reports metadata API
         try:
             r_meta = self._session._s.get(
                 "https://www.nseindia.in/api/daily-reports?key=CM", timeout=15
@@ -969,7 +888,6 @@ class DownloadsMixin:
         r = self._session._s.get(file_url, timeout=15)
         r.raise_for_status()
         lines = r.text.splitlines()
-        # First line is description, skip it; data starts after header "Sr No,Symbol,..."
         header_idx = next((i for i, l in enumerate(lines) if l.startswith("Sr No,")), 1)
         rows = _csv.DictReader(_io.StringIO("\n".join(lines[header_idx:])))
         securities = []
@@ -998,24 +916,14 @@ class DownloadsMixin:
         Returns: [{symbol, series, description, isin}]
         """
         base = dt or (date.today() - timedelta(days=1))
-        r = None
-        for offset in range(5):
-            check = base - timedelta(days=offset)
-            url = f"{_ARCHIVE}/content/equities/C_STT_{_ddmmyyyy(check)}.csv"
-            try:
-                resp = self._session._s.get(url, timeout=15)
-                if resp.status_code == 200 and b"DOCTYPE" not in resp.content[:50]:
-                    r = resp
-                    break
-            except Exception:
-                continue
-        if not r:
-            raise FileNotFoundError(f"stt_non_applicability: no file found near {base}")
-        # File starts with a blank line before the header row — skip empty lines
+        r, _ = _find_recent_file(
+            self._session,
+            lambda d: f"{_ARCHIVE}/content/equities/C_STT_{_ddmmyyyy(d)}.csv",
+            base,
+        )
         lines = [l for l in r.text.splitlines() if l.strip()]
-        reader = _csv.DictReader(_io.StringIO("\n".join(lines)))
         out = []
-        for row in reader:
+        for row in _csv.DictReader(_io.StringIO("\n".join(lines))):
             sym = (row.get("SYMBOL") or "").strip()
             if not sym:
                 continue
@@ -1033,22 +941,13 @@ class DownloadsMixin:
         Returns: [{symbol, series, isin, sec_desc, stt_indicator}]
         """
         base = dt or (date.today() - timedelta(days=1))
-        r = None
-        for offset in range(5):
-            check = base - timedelta(days=offset)
-            url = f"{_ARCHIVE}/content/equities/C_STT_IND_{_ddmmyyyy(check)}.csv"
-            try:
-                resp = self._session._s.get(url, timeout=15)
-                if resp.status_code == 200 and b"DOCTYPE" not in resp.content[:50]:
-                    r = resp
-                    break
-            except Exception:
-                continue
-        if not r:
-            raise FileNotFoundError(f"stt_equity_funds: no file found near {base}")
-        rows = list(_csv.DictReader(_io.StringIO(r.text)))
+        r, _ = _find_recent_file(
+            self._session,
+            lambda d: f"{_ARCHIVE}/content/equities/C_STT_IND_{_ddmmyyyy(d)}.csv",
+            base,
+        )
         out = []
-        for row in rows:
+        for row in _csv.DictReader(_io.StringIO(r.text)):
             sym = (row.get("SYMBOL") or "").strip()
             if not sym:
                 continue
@@ -1064,11 +963,13 @@ class DownloadsMixin:
     def circuit_square_off(self, dt: date | None = None) -> list[dict]:
         """Circuit Square-off (CSQR) — securities squared off at circuit price.
 
+        NOTE: Uses www.nseindia.in/api/daily-reports — blocked from cloud/datacenter IPs.
+        Will raise an exception when called from a cloud environment.
+
         Returns: [{symbol, series, settlement_type, settlement_no, price}]
         """
         import re
         dt = dt or (date.today() - timedelta(days=1))
-        # Filename: CSQR_M{YYYY}{NNN}_{ddmmyyyy}.csv — settlement number via API
         try:
             r_meta = self._session._s.get(
                 "https://www.nseindia.in/api/daily-reports?key=CM", timeout=15
@@ -1111,11 +1012,12 @@ class DownloadsMixin:
     def latency_statistics(self) -> dict:
         """CM segment latency statistics — most recent published file (rolling).
 
+        NOTE: Uses www.nseindia.in/api/daily-reports — blocked from cloud/datacenter IPs.
+        Will raise an exception when called from a cloud environment.
+
         Returns: {observation_date, rows: [{segment, min_us, mean_us, p50_us, p90_us,
                    p99_us, max_us, order_messages}]}
         """
-        # The file is not dated by today but by last available trading day;
-        # use the daily-reports API to get the exact filename.
         try:
             r_meta = self._session._s.get(
                 "https://www.nseindia.in/api/daily-reports?key=CM", timeout=15
@@ -1148,7 +1050,7 @@ class DownloadsMixin:
         if len(lines) > 1:
             reader = _csv.DictReader(_io.StringIO("\n".join(lines[1:])))
             for row in reader:
-                def _f(k): return float((row.get(k) or "0").strip().split("M")[0] or 0)
+                def _f(k, _row=row): return float((_row.get(k) or "0").strip().split("M")[0] or 0)
                 seg = (row.get("Segment") or "").strip()
                 if not seg:
                     continue
@@ -1174,18 +1076,6 @@ class DownloadsMixin:
         filename = f"MW{_ddmmyyyy(dt)}.zip"
         url = f"{_ARCHIVE}/archives/equities/bhavcopy/{filename}"
         _dl = lambda u: self._session.download_zip(u, folder=Path(folder))
-        return self._guardian.guarded_archive(url, _dl) if self._guardian else _dl(url)
-
-    def cm_mii_security_report(
-        self,
-        dt:     date | None = None,
-        folder: str | Path  = ".",
-    ) -> Path:
-        """CM MII Security report — OHLCV + delivery % for all EQ series stocks."""
-        dt = dt or (date.today() - timedelta(days=1))
-        filename = f"sec_bhavdata_full_{_ddmmyyyy(dt)}.csv"
-        url = f"{_ARCHIVE}/products/content/{filename}"
-        _dl = lambda u: self._session.download_file(u, folder=Path(folder), filename=filename)
         return self._guardian.guarded_archive(url, _dl) if self._guardian else _dl(url)
 
     # ------------------------------------------------------------------ #
@@ -1223,45 +1113,36 @@ class DownloadsMixin:
                   last_traded_price, isin, status}].
         ~6000+ rows.
         """
-        import csv as _csv2, io as _io2
         base = dt or date.today()
-        for offset in range(5):
-            check = base - timedelta(days=offset)
-            if check.weekday() >= 5:
+        r, check = _find_recent_file(
+            self._session,
+            lambda d: (
+                f"{_ARCHIVE}/content/historical/WDM/{d.strftime('%Y')}"
+                f"/{d.strftime('%b').upper()}/wdmlist_{d.strftime('%d%m%Y')}.csv"
+            ),
+            base,
+        )
+        out = []
+        for row in _csv.DictReader(_io.StringIO(r.text)):
+            sym = (row.get("SECURITY") or "").strip()
+            if not sym:
                 continue
-            ds = check.strftime("%d%m%Y")
-            yr = check.strftime("%Y")
-            mn = check.strftime("%b").upper()
-            url = f"{_ARCHIVE}/content/historical/WDM/{yr}/{mn}/wdmlist_{ds}.csv"
-            try:
-                r = self._session._s.get(url, timeout=20)
-                if r.status_code == 200 and b"DOCTYPE" not in r.content[:50]:
-                    reader = _csv2.DictReader(_io2.StringIO(r.text))
-                    out = []
-                    for row in reader:
-                        sym = (row.get("SECURITY") or "").strip()
-                        if not sym:
-                            continue
-                        out.append({
-                            "sectype":           (row.get("SECTYPE") or "").strip(),
-                            "symbol":            sym,
-                            "issue_name":        (row.get("ISSUE_NAME") or "").strip(),
-                            "issue_desc":        (row.get("ISSUE_DESC") or "").strip(),
-                            "issue_date":        (row.get("ISSUE_DATE") or "").strip(),
-                            "mat_date":          (row.get("MAT_DATE") or "").strip(),
-                            "last_ip_dt":        (row.get("Last IP Dt") or "").strip(),
-                            "next_ip_dt":        (row.get("Next IP Dt") or "").strip(),
-                            "cpn_freq":          (row.get("Cpn Freq") or "").strip(),
-                            "last_traded_date":  (row.get("Last Traded Date") or "").strip(),
-                            "last_traded_price": (row.get("Last Traded Price (in Rs.)") or "").strip(),
-                            "isin":              (row.get("ISIN NO.") or "").strip(),
-                            "status":            (row.get("STATUS") or "").strip(),
-                        })
-                    if out:
-                        return out
-            except Exception:
-                continue
-        return []
+            out.append({
+                "sectype":           (row.get("SECTYPE") or "").strip(),
+                "symbol":            sym,
+                "issue_name":        (row.get("ISSUE_NAME") or "").strip(),
+                "issue_desc":        (row.get("ISSUE_DESC") or "").strip(),
+                "issue_date":        (row.get("ISSUE_DATE") or "").strip(),
+                "mat_date":          (row.get("MAT_DATE") or "").strip(),
+                "last_ip_dt":        (row.get("Last IP Dt") or "").strip(),
+                "next_ip_dt":        (row.get("Next IP Dt") or "").strip(),
+                "cpn_freq":          (row.get("Cpn Freq") or "").strip(),
+                "last_traded_date":  (row.get("Last Traded Date") or "").strip(),
+                "last_traded_price": (row.get("Last Traded Price (in Rs.)") or "").strip(),
+                "isin":              (row.get("ISIN NO.") or "").strip(),
+                "status":            (row.get("STATUS") or "").strip(),
+            })
+        return out
 
     def wdm_daily_report(self, dt: date | None = None) -> dict:
         """Debt segment (WDM) daily trade report.
@@ -1273,76 +1154,68 @@ class DownloadsMixin:
                 maturities: list}.
         Zip contains settlement CSV + additions/maturities CSVs.
         """
-        import csv as _csv2, io as _io2, zipfile as _zf
+        import zipfile as _zf
         base = dt or date.today()
-        for offset in range(5):
-            check = base - timedelta(days=offset)
-            if check.weekday() >= 5:
-                continue
-            ds = check.strftime("%d%m%Y")
-            ddmm = check.strftime("%d%m")
-            url = f"{_ARCHIVE}/content/debt/dly{ds}.zip"
-            try:
-                r = self._session._s.get(url, timeout=30)
-                if r.status_code == 200 and b"DOCTYPE" not in r.content[:50]:
-                    with _zf.ZipFile(_io2.BytesIO(r.content)) as z:
-                        names = z.namelist()
+        try:
+            r, check = _find_recent_file(
+                self._session,
+                lambda d: f"{_ARCHIVE}/content/debt/dly{d.strftime('%d%m%Y')}.zip",
+                base,
+            )
+        except FileNotFoundError:
+            return {"date": None, "trades": [], "additions": [], "maturities": []}
 
-                        # Trade settlement CSV
-                        sett_name = next((n for n in names if n.startswith("trd") and n.endswith("_sett.csv")), None)
-                        trades = []
-                        if sett_name:
-                            text = z.read(sett_name).decode("utf-8", errors="replace")
-                            reader = _csv2.DictReader(_io2.StringIO(text))
-                            for row in reader:
-                                sym = (row.get("Security") or "").strip()
-                                if not sym:
-                                    continue
-                                trades.append({
-                                    "trade_date":      (row.get("Trade date") or "").strip(),
-                                    "sectype":         (row.get("Sectype") or "").strip(),
-                                    "symbol":          sym,
-                                    "issue_name":      (row.get("Issue Name") or "").strip(),
-                                    "settl_days":      (row.get("Settl Days") or "").strip(),
-                                    "trade_type":      (row.get("Trade Type") or "").strip(),
-                                    "num_trades":      (row.get("No.of Trades") or "").strip(),
-                                    "traded_value_cr": (row.get("Traded Value (Rs.Cr.)") or "").strip(),
-                                    "low":             (row.get("Low Price/Rate") or "").strip(),
-                                    "high":            (row.get("High Price/Rate") or "").strip(),
-                                    "last":            (row.get("Last Traded Price/Rate") or "").strip(),
-                                    "vwap":            (row.get("Value Weighted Average Price/Rate") or "").strip(),
-                                    "wtd_ytm":         (row.get("Weighted YTM") or "").strip(),
-                                })
+        with _zf.ZipFile(_io.BytesIO(r.content)) as z:
+            names = z.namelist()
 
-                        def _parse_csv_z(name_prefix):
-                            nm = next((n for n in names if n.startswith(name_prefix) and n.endswith(".csv")), None)
-                            if not nm:
-                                return []
-                            text = z.read(nm).decode("utf-8", errors="replace")
-                            lines = [l for l in text.splitlines() if l.strip()]
-                            if not lines:
-                                return []
-                            # Skip first line if it looks like a title (not a proper header)
-                            if lines[0].startswith(",,,"):
-                                lines = lines[1:]
-                            reader = _csv2.DictReader(_io2.StringIO("\n".join(lines)))
-                            out = []
-                            for row in reader:
-                                sym2 = (row.get("Security") or "").strip()
-                                if not sym2:
-                                    continue
-                                out.append({k.strip(): (v or "").strip() for k, v in row.items() if k and k.strip()})
-                            return out
+            sett_name = next((n for n in names if n.startswith("trd") and n.endswith("_sett.csv")), None)
+            trades = []
+            if sett_name:
+                text = z.read(sett_name).decode("utf-8", errors="replace")
+                for row in _csv.DictReader(_io.StringIO(text)):
+                    sym = (row.get("Security") or "").strip()
+                    if not sym:
+                        continue
+                    trades.append({
+                        "trade_date":      (row.get("Trade date") or "").strip(),
+                        "sectype":         (row.get("Sectype") or "").strip(),
+                        "symbol":          sym,
+                        "issue_name":      (row.get("Issue Name") or "").strip(),
+                        "settl_days":      (row.get("Settl Days") or "").strip(),
+                        "trade_type":      (row.get("Trade Type") or "").strip(),
+                        "num_trades":      (row.get("No.of Trades") or "").strip(),
+                        "traded_value_cr": (row.get("Traded Value (Rs.Cr.)") or "").strip(),
+                        "low":             (row.get("Low Price/Rate") or "").strip(),
+                        "high":            (row.get("High Price/Rate") or "").strip(),
+                        "last":            (row.get("Last Traded Price/Rate") or "").strip(),
+                        "vwap":            (row.get("Value Weighted Average Price/Rate") or "").strip(),
+                        "wtd_ytm":         (row.get("Weighted YTM") or "").strip(),
+                    })
 
-                        return {
-                            "date":       check.isoformat(),
-                            "trades":     trades,
-                            "additions":  _parse_csv_z("add"),
-                            "maturities": _parse_csv_z("mat"),
-                        }
-            except Exception:
-                continue
-        return {"date": None, "trades": [], "additions": [], "maturities": []}
+            def _parse_csv_z(name_prefix):
+                nm = next((n for n in names if n.startswith(name_prefix) and n.endswith(".csv")), None)
+                if not nm:
+                    return []
+                text = z.read(nm).decode("utf-8", errors="replace")
+                lines = [l for l in text.splitlines() if l.strip()]
+                if not lines:
+                    return []
+                if lines[0].startswith(",,,"):
+                    lines = lines[1:]
+                out = []
+                for row in _csv.DictReader(_io.StringIO("\n".join(lines))):
+                    sym2 = (row.get("Security") or "").strip()
+                    if not sym2:
+                        continue
+                    out.append({k.strip(): (v or "").strip() for k, v in row.items() if k and k.strip()})
+                return out
+
+            return {
+                "date":       check.isoformat(),
+                "trades":     trades,
+                "additions":  _parse_csv_z("add"),
+                "maturities": _parse_csv_z("mat"),
+            }
 
     def egr_var_files(self, dt: date | None = None) -> list[dict]:
         """EGR segment (Exchange for Gold Receipts) VaR margin files.
@@ -1352,43 +1225,44 @@ class DownloadsMixin:
         Returns [{snapshot, date, symbol, segment, isin, prev_daily_vol,
                   current_daily_vol, annualised_vol, price_band_pct}].
         """
-        import io as _io2
         base = dt or date.today()
-        for offset in range(5):
-            check = base - timedelta(days=offset)
-            if check.weekday() >= 5:
-                continue
-            ds = check.strftime("%d%m%Y")
-            rows = []
-            found_any = False
-            for snap in range(1, 7):
-                url = f"{_ARCHIVE}/content/egr/E_VAR1_{ds}_{snap}.DAT"
-                try:
-                    r = self._session._s.get(url, timeout=15)
-                    if r.status_code != 200 or b"DOCTYPE" in r.content[:50]:
-                        continue
-                    found_any = True
-                    for line in r.text.splitlines():
-                        parts = line.split(",")
-                        if not parts or parts[0] != "20":
-                            continue
-                        if len(parts) < 10:
-                            continue
-                        rows.append({
-                            "snapshot":        snap,
-                            "date":            ds,
-                            "symbol":          parts[1].strip(),
-                            "segment":         parts[2].strip(),
-                            "isin":            parts[3].strip(),
-                            "prev_daily_vol":  parts[4].strip(),
-                            "daily_vol_added": parts[5].strip(),
-                            "price_band_pct":  parts[6].strip(),
-                            "current_daily_vol": parts[7].strip(),
-                            "annualised_vol":  parts[8].strip(),
-                            "var_pct":         parts[9].strip(),
-                        })
-                except Exception:
+        # Find the most recent day with EGR VaR files
+        try:
+            _, found_dt = _find_recent_file(
+                self._session,
+                lambda d: f"{_ARCHIVE}/content/egr/E_VAR1_{d.strftime('%d%m%Y')}_1.DAT",
+                base,
+            )
+        except FileNotFoundError:
+            return []
+
+        rows = []
+        ds = found_dt.strftime("%d%m%Y")
+        for snap in range(1, 7):
+            url = f"{_ARCHIVE}/content/egr/E_VAR1_{ds}_{snap}.DAT"
+            try:
+                r = self._session._s.get(url, timeout=15)
+                if r.status_code != 200 or b"DOCTYPE" in r.content[:50]:
                     continue
-            if found_any:
-                return rows
-        return []
+                for line in r.text.splitlines():
+                    parts = line.split(",")
+                    if not parts or parts[0] != "20":
+                        continue
+                    if len(parts) < 10:
+                        continue
+                    rows.append({
+                        "snapshot":        snap,
+                        "date":            ds,
+                        "symbol":          parts[1].strip(),
+                        "segment":         parts[2].strip(),
+                        "isin":            parts[3].strip(),
+                        "prev_daily_vol":  parts[4].strip(),
+                        "daily_vol_added": parts[5].strip(),
+                        "price_band_pct":  parts[6].strip(),
+                        "current_daily_vol": parts[7].strip(),
+                        "annualised_vol":  parts[8].strip(),
+                        "var_pct":         parts[9].strip(),
+                    })
+            except Exception:
+                continue
+        return rows
