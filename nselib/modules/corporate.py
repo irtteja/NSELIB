@@ -249,6 +249,71 @@ class CorporateMixin:
         resp = self._session.get("corporate-board-meetings", params=params)
         return resp if isinstance(resp, list) else resp.get("data", resp)
 
+    def board_meeting_detail(self, xml_url: str) -> dict:
+        """
+        Parsed fields from a board meeting XBRL XML (the `attachment` URL from board_meetings()).
+        Returns dict with keys: symbol, company, isin, meeting_type, intimation_type,
+        meeting_date, report_date, trading_window_closed, trading_window_start,
+        trading_window_end, agenda, results_audited, results_nature, reporting_period,
+        reporting_month, reporting_year, dividend_type, and any extra tags.
+        """
+        r = self._session._s.get(xml_url, timeout=20)
+        r.raise_for_status()
+        root = ET.fromstring(r.content)
+
+        # strip namespace from tag name
+        def local(tag: str) -> str:
+            return tag.split("}")[-1] if "}" in tag else tag
+
+        raw: dict[str, str] = {}
+        for el in root.iter():
+            name = local(el.tag)
+            text = (el.text or "").strip()
+            if text and name not in ("xbrl", "context", "unit", "schemaRef",
+                                     "entity", "identifier", "period",
+                                     "instant", "startDate", "endDate", "measure"):
+                raw[name] = text
+
+        def get(*keys: str) -> str | None:
+            for k in keys:
+                if k in raw:
+                    return raw.pop(k)
+            return None
+
+        result: dict = {
+            "symbol":                get("NSESymbol"),
+            "company":               get("NameOfTheCompany"),
+            "isin":                  get("ISIN"),
+            "meeting_type":          get("TypeOfMeeting"),
+            "intimation_type":       get("TypeOfIntimation"),
+            "meeting_date":          get("DateOfProposedMeeting"),
+            "report_date":           get("DateOfReport"),
+            "trading_window_closed": get("WhetherTradingWindowIsClosed"),
+            "trading_window_start":  get("DateOfStartOfTradingWindowClosure"),
+            "trading_window_end":    get("DetailsOfDateOfEndOfTradingWindowClosure"),
+            "results_audited":       get("WhetherResultsAreAuditedOrUnaudited"),
+            "results_nature":        get("NatureOfReportStandaloneConsolidated"),
+            "reporting_period":      get("ReportingPeriodType"),
+            "reporting_month":       get("MonthOfPeriodEnded"),
+            "reporting_year":        get("YearOfPeriodEnded"),
+            "dividend_type":         get("TypeOfDividend"),
+        }
+
+        # collect agenda items (Agenda1, Agenda2, …)
+        agenda = []
+        for i in range(1, 20):
+            val = get(f"Agenda{i}")
+            if val:
+                agenda.append(val)
+            else:
+                break
+        result["agenda"] = agenda
+
+        # any remaining unrecognised tags
+        result["extra"] = raw
+
+        return {k: v for k, v in result.items() if v not in (None, [], {})}
+
     def financial_results(
         self,
         symbol:    str | None = None,

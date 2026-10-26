@@ -32,6 +32,7 @@ Format: `- [ ]` pending · `- [x]` done · `- [~]` blocked/deferred
 - [x] `corporate_actions(symbol)` — dividends, splits, bonuses
 - [x] `announcements(symbol)` — company announcements
 - [x] `board_meetings(symbol)` — board meeting dates
+- [x] `board_meeting_detail(xml_url)` — parsed XBRL fields from board meeting intimation XML
 - [x] `shareholding_patterns(symbol)` — promoter/FII/DII/public
 - [x] `annual_reports(symbol)` — annual report links
 - [x] `insider_trading(symbol)` — SAST/insider filings

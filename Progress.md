@@ -4,6 +4,17 @@ Newest entries at top.
 
 ---
 
+## 2026-10-26
+
+### Added `board_meeting_detail(xml_url)` to corporate.py
+- Parses XBRL XML from board meeting intimation attachment (`attachment` field from `board_meetings()`)
+- Fetches via `self._session._s.get()` — archive-safe, bypasses Akamai
+- Strips XML namespaces, extracts 16 named fields: symbol, company, ISIN, meeting type, intimation type, meeting date, report date, trading window status/dates, agenda items, results nature, reporting period
+- Returns `extra` dict for any unknown tags
+- Tested on AAVAS XML — returns full structured dict with 16 fields + 2-item agenda + remarks in `extra`
+
+---
+
 ## 2026-10-24 (continued)
 
 ### Fixed Rule 17 violation — guardian now enforces verification before commit
