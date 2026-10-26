@@ -139,17 +139,121 @@ class DownloadsMixin:
             _dl = lambda u: self._session.download_file(u, folder=Path(folder), filename=filename)
             return self._guardian.guarded_archive(url, _dl) if self._guardian else _dl(url)
 
-    def pr_bhavcopy(
-        self,
-        dt:     date | None = None,
-        folder: str | Path  = ".",
-    ) -> Path:
-        """PR bhavcopy (all segments combined). Uses 2-digit year format."""
+    def pr_bhavcopy(self, dt: date | None = None) -> dict:
+        """
+        PR bhavcopy zip — all 13 files parsed and returned as a dict.
+
+        Keys:
+          announcements   – list[dict]: symbol, company, type, text
+          corporate_actions – list[dict]: SERIES, SYMBOL, SECURITY, dates, PURPOSE
+          circuit_hitters – list[dict]: SYMBOL, SERIES, SECURITY, HIGH_LOW ('H'/'L')
+          board_meetings  – list[dict]: symbol, company, date, purpose
+          corporate_bonds – list[dict]: OHLCV for corporate bonds traded
+          etf             – list[dict]: OHLCV for ETFs traded
+          gainers_losers  – list[dict]: GAIN_LOSS, SECURITY, CLOSE_PRIC, PREV_CL_PR, PERCENT_CG
+          new_highs_lows  – list[dict]: SECURITY, NEW, PREVIOUS, STATUS ('H'/'L')
+          market_cap      – list[dict]: Symbol, Security Name, Market Cap, Close Price
+          bhavcopy        – list[dict]: full equity bhavcopy with Symbol + 52wk H/L
+          sme             – list[dict]: SME segment OHLCV
+          top_by_value    – list[dict]: top 25 securities by traded value
+        """
+        import zipfile as _zf
         dt = dt or (date.today() - timedelta(days=1))
-        filename = f"PR{_ddmmyy(dt)}.zip"
-        url = f"{_ARCHIVE}/archives/equities/bhavcopy/pr/{filename}"
-        _dl = lambda u: self._session.download_zip(u, folder=Path(folder))
-        return self._guardian.guarded_archive(url, _dl) if self._guardian else _dl(url)
+        while dt.weekday() >= 5:
+            dt -= timedelta(days=1)
+
+        url = f"{_ARCHIVE}/archives/equities/bhavcopy/pr/PR{_ddmmyy(dt)}.zip"
+        r = (self._guardian.guarded_archive(url, lambda u: self._session._s.get(u, timeout=30))
+             if self._guardian else self._session._s.get(url, timeout=30))
+        r.raise_for_status()
+
+        z = _zf.ZipFile(_io.BytesIO(r.content))
+
+        def _read(name_prefix):
+            for info in z.infolist():
+                if info.filename.startswith(name_prefix):
+                    with z.open(info.filename) as f:
+                        return f.read().decode("latin-1", errors="replace")
+            return ""
+
+        def _csv_rows(text):
+            text = text.strip()
+            if not text:
+                return []
+            reader = _csv.DictReader(_io.StringIO(text))
+            return [{k.strip(): v.strip() for k, v in row.items()} for row in reader]
+
+        # --- announcements (an*.txt) ---
+        def _parse_announcements(text):
+            out = []
+            for line in text.splitlines()[1:]:   # skip header
+                line = line.strip()
+                if not line:
+                    continue
+                parts = line.split(" : ", 2)
+                if len(parts) < 2:
+                    continue
+                company_sym = parts[0].strip()
+                words = company_sym.split()
+                symbol = words[-1] if words else ""
+                company = " ".join(words[:-1])
+                ann_type_sym = parts[1].strip()
+                ann_words = ann_type_sym.split()
+                ann_type = " ".join(ann_words[:-1]) if len(ann_words) > 1 else ann_type_sym
+                text_body = parts[2].strip() if len(parts) > 2 else ""
+                out.append({"symbol": symbol, "company": company,
+                            "type": ann_type, "text": text_body})
+            return out
+
+        # --- board meetings (bm*.txt) ---
+        def _parse_board_meetings(text):
+            out = []
+            for line in text.splitlines()[1:]:
+                line = line.strip()
+                if not line:
+                    continue
+                parts = line.split(" : ", 2)
+                if len(parts) < 2:
+                    continue
+                words = parts[0].strip().split()
+                symbol = words[-1] if words else ""
+                company = " ".join(words[:-1])
+                bm_date = parts[1].strip()
+                purpose = parts[2].strip() if len(parts) > 2 else ""
+                out.append({"symbol": symbol, "company": company,
+                            "date": bm_date, "purpose": purpose})
+            return out
+
+        # --- gainers/losers — skip section-header rows (empty GAIN_LOSS + SECURITY is a label) ---
+        def _parse_gl(rows):
+            return [r for r in rows
+                    if r.get("GAIN_LOSS", "").strip() in ("G", "L")]
+
+        # --- new highs/lows ---
+        def _parse_hl(rows):
+            out = []
+            for r in rows:
+                status = r.get("NEW_STATUS", r.get("HIGH/LOW", "")).strip()
+                out.append({"security": r.get("SECURITY", "").strip(),
+                            "new_price": r.get("NEW", "").strip(),
+                            "previous": r.get("PREVIOUS", "").strip(),
+                            "status": status})
+            return out
+
+        return {
+            "announcements":    _parse_announcements(_read("an")),
+            "corporate_actions": _csv_rows(_read("bc")),
+            "circuit_hitters":  _csv_rows(_read("bh")),
+            "board_meetings":   _parse_board_meetings(_read("bm")),
+            "corporate_bonds":  _csv_rows(_read("corpbond")),
+            "etf":              _csv_rows(_read("etf")),
+            "gainers_losers":   _parse_gl(_csv_rows(_read("gl"))),
+            "new_highs_lows":   _parse_hl(_csv_rows(_read("hl"))),
+            "market_cap":       _csv_rows(_read("mcap")),
+            "bhavcopy":         _csv_rows(_read("pd")),
+            "sme":              _csv_rows(_read("sme")),
+            "top_by_value":     _csv_rows(_read("tt")),
+        }
 
     def full_bhavcopy_delivery(
         self,
