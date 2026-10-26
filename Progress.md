@@ -4,6 +4,42 @@ Newest entries at top.
 
 ---
 
+## 2026-10-26 (session 3)
+
+### Added all remaining Equities & SME daily report methods to downloads.py
+
+Queried `NSE_API_IN/daily-reports?key=CM` to get exact `filePath` + `fileActlName` for all 32 files in the CurrentDay listing. Implemented the 14 missing methods:
+
+**Haircut / VaR / margin data:**
+- `haircut_approved_securities(date)` — `content/equities/APPSEC_COLLVAL_{ddmmyyyy}.csv` — 1012 rows, no header, cols: symbol, isin, valuation_price, haircut; 5-day retry
+- `haircut_mutual_funds(date)` — `archives/equities/mf_haircut/MF_VAR_{ddmmyyyy}.csv` — 7167 rows; 5-day retry
+- `haircut_all_approved(date)` — `content/equities/APPSEC_ALL_{ddmmyyyy}.CSV` — 9150 rows (equity + MF combined); 5-day retry
+- `var_files(date)` — `archives/nsccl/var/C_VAR1_{ddmmyyyy}_{1-6}.DAT` — 6 intraday snapshots merged (~113k rows total); 5-day retry; record type 10 = header, 20 = data
+
+**Corporate / trading reports:**
+- `corporate_bonds_traded(date)` — `archives/equities/corpbond/corpbond{ddmmyyyy}.csv` — 159 rows OHLCV for debt segment; 5-day retry
+- `market_activity_report(date)` — `archives/equities/mkt/MA{ddmmyy}.csv` — 2-digit year; free-text narrative + KV stats parsed; 5-day retry
+- `series_changes()` — `content/equities/series_change.csv` — rolling file (no date), ~16 rows showing recent series transitions
+
+**Auction & settlement:**
+- `auction_securities(date)` — `content/nsccl/AUB_{YYYY}{NNN}_{ddmmyyyy}.csv` — complex filename with settlement number; uses daily-reports API to get exact URL; ~265 rows; first line is description, skipped
+- `circuit_square_off(date)` — `archives/equities/csqr/CSQR_M{YYYY}{NNN}_{ddmmyyyy}.csv` — same settlement-number pattern; uses daily-reports API; ~13900 rows no-header CSV
+
+**Tax-related:**
+- `stt_non_applicability(date)` — `content/equities/C_STT_{ddmmyyyy}.csv` — ~12809 rows; bug fix: file starts with blank line before header, must filter empty lines before DictReader; 5-day retry
+- `stt_equity_funds(date)` — `content/equities/C_STT_IND_{ddmmyyyy}.csv` — ~1189 MF units classified as equity-oriented for STT; 5-day retry
+
+**Operational:**
+- `latency_statistics()` — `content/CM_Latency_stats{ddmmyyyy}.csv` — uses daily-reports API (file date ≠ today — published for last trading day, not current day); parses 2 rows (CM + FO segments) with latency percentiles in microseconds
+
+**Skipped (non-CSV binary formats):**
+- `Daily_Settlement_Statistics_{ddmmyyyy}.doc` — binary .doc Word document
+- `FCM_INTRM_BC{ddmmyyyy}.DAT` — binary bhavcopy DAT at `content/trdops/`
+
+All 32 CurrentDay files from NSE CM daily reports now have corresponding methods. Complete coverage achieved.
+
+---
+
 ## 2026-10-26 (continued)
 
 ### Added margin_trading_disclosure, mwpl_oi, combined_oi from zip file inspection

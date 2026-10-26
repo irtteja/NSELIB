@@ -448,6 +448,516 @@ class DownloadsMixin:
     #  Daily reports                                                       #
     # ------------------------------------------------------------------ #
 
+    # ------------------------------------------------------------------ #
+    #  Haircut / VaR / margin files                                       #
+    # ------------------------------------------------------------------ #
+
+    def haircut_approved_securities(self, dt: date | None = None) -> list[dict]:
+        """Haircut (VaR margin) for NSCCL-approved securities — ~4000 rows.
+
+        Returns: [{symbol, isin, valuation_price, haircut}]
+        """
+        base = dt or (date.today() - timedelta(days=1))
+        r = None
+        for offset in range(5):
+            check = base - timedelta(days=offset)
+            url = f"{_ARCHIVE}/content/equities/APPSEC_COLLVAL_{_ddmmyyyy(check)}.csv"
+            try:
+                resp = self._session._s.get(url, timeout=15)
+                if resp.status_code == 200 and b"DOCTYPE" not in resp.content[:50]:
+                    r = resp
+                    break
+            except Exception:
+                continue
+        if not r:
+            raise FileNotFoundError(f"haircut_approved_securities: no file found near {base}")
+        out = []
+        for line in r.text.splitlines():
+            parts = [p.strip() for p in line.split(",")]
+            if len(parts) >= 5:
+                try:
+                    out.append({
+                        "symbol":          parts[1],
+                        "isin":            parts[2],
+                        "valuation_price": float(parts[3]),
+                        "haircut":         float(parts[4]),
+                    })
+                except (ValueError, IndexError):
+                    continue
+        return out
+
+    def haircut_mutual_funds(self, dt: date | None = None) -> list[dict]:
+        """Haircut for mutual fund units accepted as collateral — all MF ISIN rows.
+
+        Returns: [{isin, symbol, series, type, haircut, nav}]
+        """
+        base = dt or (date.today() - timedelta(days=1))
+        r = None
+        for offset in range(5):
+            check = base - timedelta(days=offset)
+            url = f"{_ARCHIVE}/archives/equities/mf_haircut/MF_VAR_{_ddmmyyyy(check)}.csv"
+            try:
+                resp = self._session._s.get(url, timeout=15)
+                if resp.status_code == 200 and b"DOCTYPE" not in resp.content[:50]:
+                    r = resp
+                    break
+            except Exception:
+                continue
+        if not r:
+            raise FileNotFoundError(f"haircut_mutual_funds: no file found near {base}")
+        reader = _csv.DictReader(_io.StringIO(r.text))
+        out = []
+        for row in reader:
+            try:
+                out.append({
+                    "isin":    (row.get("ISIN") or "").strip(),
+                    "symbol":  (row.get("SYMBOL") or "").strip(),
+                    "series":  (row.get("SERIES") or "").strip(),
+                    "type":    (row.get("TYPE") or "").strip(),
+                    "haircut": float((row.get("HAIRCUT") or "0").strip() or 0),
+                    "nav":     float((row.get("NAV") or "0").strip() or 0),
+                })
+            except (ValueError, TypeError):
+                continue
+        return out
+
+    def haircut_all_approved(self, dt: date | None = None) -> list[dict]:
+        """Haircut for ALL approved securities (equity + MF combined) — ~4000 rows.
+
+        Returns: [{symbol, isin, valuation_price, haircut}]
+        """
+        base = dt or (date.today() - timedelta(days=1))
+        r = None
+        for offset in range(5):
+            check = base - timedelta(days=offset)
+            url = f"{_ARCHIVE}/content/equities/APPSEC_ALL_{_ddmmyyyy(check)}.CSV"
+            try:
+                resp = self._session._s.get(url, timeout=15)
+                if resp.status_code == 200 and b"DOCTYPE" not in resp.content[:50]:
+                    r = resp
+                    break
+            except Exception:
+                continue
+        if not r:
+            raise FileNotFoundError(f"haircut_all_approved: no file found near {base}")
+        reader = _csv.DictReader(_io.StringIO(r.text))
+        out = []
+        for row in reader:
+            sym = (row.get("Symbol") or "").strip()
+            if not sym:
+                continue
+            try:
+                out.append({
+                    "symbol":          sym,
+                    "isin":            (row.get("ISIN") or "").strip(),
+                    "valuation_price": float((row.get("Valuation Price") or "0").strip() or 0),
+                    "haircut":         float((row.get("Applicable Haircut") or "0").strip() or 0),
+                })
+            except (ValueError, TypeError):
+                continue
+        return out
+
+    def var_files(self, dt: date | None = None) -> list[dict]:
+        """VaR (Value at Risk) margin data for all securities — 6 intraday snapshots.
+
+        NSE publishes 6 VaR files per day (_1 = begin-of-day, _2-5 = intraday, _6 = end-of-day).
+        Returns all 6 merged; each row has a 'snapshot' field (1–6).
+
+        Returns: [{snapshot, symbol, series, isin, short_term_var, index_var, applicable_var, ...}]
+        """
+        base = dt or (date.today() - timedelta(days=1))
+        # Find the most recent trading day that has VaR files
+        found_dt = None
+        for offset in range(5):
+            check = base - timedelta(days=offset)
+            test_url = f"{_ARCHIVE}/archives/nsccl/var/C_VAR1_{_ddmmyyyy(check)}_1.DAT"
+            try:
+                resp = self._session._s.get(test_url, timeout=15)
+                if resp.status_code == 200 and b"DOCTYPE" not in resp.content[:50]:
+                    found_dt = check
+                    break
+            except Exception:
+                continue
+        if not found_dt:
+            raise FileNotFoundError(f"var_files: no files found near {base}")
+        out = []
+        for snap in range(1, 7):
+            url = f"{_ARCHIVE}/archives/nsccl/var/C_VAR1_{_ddmmyyyy(found_dt)}_{snap}.DAT"
+            r = self._session._s.get(url, timeout=15)
+            if r.status_code != 200:
+                continue
+            for line in r.text.splitlines():
+                parts = line.strip().split(",")
+                if not parts or parts[0] != "20":
+                    continue
+                if len(parts) < 10:
+                    continue
+                try:
+                    out.append({
+                        "snapshot":         snap,
+                        "symbol":           parts[1],
+                        "series":           parts[2],
+                        "isin":             parts[3],
+                        "price_scan_range": float(parts[4] or 0),
+                        "short_term_var":   float(parts[5] or 0),
+                        "index_var":        float(parts[6] or 0),
+                        "applicable_var":   float(parts[7] or 0),
+                        "adhoc_margin":     float(parts[8] or 0),
+                        "total_var":        float(parts[9] or 0),
+                    })
+                except (ValueError, IndexError):
+                    continue
+        return out
+
+    # ------------------------------------------------------------------ #
+    #  Corporate / trading reports                                         #
+    # ------------------------------------------------------------------ #
+
+    def corporate_bonds_traded(self, dt: date | None = None) -> list[dict]:
+        """Corporate bonds traded on NSE for the given date.
+
+        Returns: [{symbol, security, series, prev_close, open, high, low, close,
+                   traded_value, traded_qty, trades, hi_52wk, lo_52wk}]
+        """
+        base = dt or (date.today() - timedelta(days=1))
+        r = None
+        for offset in range(5):
+            check = base - timedelta(days=offset)
+            url = f"{_ARCHIVE}/archives/equities/corpbond/corpbond{_ddmmyyyy(check)}.csv"
+            try:
+                resp = self._session._s.get(url, timeout=15)
+                if resp.status_code == 200 and b"DOCTYPE" not in resp.content[:50]:
+                    r = resp
+                    break
+            except Exception:
+                continue
+        if not r:
+            raise FileNotFoundError(f"corporate_bonds_traded: no file found near {base}")
+        rows = list(_csv.DictReader(_io.StringIO(r.text)))
+        out = []
+        for row in rows:
+            sym = (row.get("SYMBOL") or "").strip()
+            if not sym:
+                continue
+            def _f(k): return float((row.get(k) or "0").strip().replace(",", "") or 0)
+            out.append({
+                "symbol":       sym,
+                "security":     (row.get("SECURITY") or "").strip(),
+                "series":       (row.get("SERIES") or "").strip(),
+                "prev_close":   _f("PREV_CL_PR"),
+                "open":         _f("OPEN_PRICE"),
+                "high":         _f("HIGH_PRICE"),
+                "low":          _f("LOW_PRICE"),
+                "close":        _f("CLOSE_PRICE"),
+                "traded_value": _f("NET_TRDVAL"),
+                "traded_qty":   int(_f("NET_TRDQTY")),
+                "trades":       int(_f("TRADES")),
+                "hi_52wk":      _f("HI_52_WK"),
+                "lo_52wk":      _f("LO_52_WK"),
+            })
+        return out
+
+    def market_activity_report(self, dt: date | None = None) -> dict:
+        """Market Activity Report — daily market summary statistics.
+
+        Returns: {date, traded_value_cr, traded_qty_lakhs, num_trades,
+                  market_cap_cr, text (raw narrative)}
+        """
+        base = dt or (date.today() - timedelta(days=1))
+        r = None
+        found_dt = base
+        for offset in range(5):
+            check = base - timedelta(days=offset)
+            url = f"{_ARCHIVE}/archives/equities/mkt/MA{_ddmmyy(check)}.csv"
+            try:
+                resp = self._session._s.get(url, timeout=15)
+                if resp.status_code == 200 and b"DOCTYPE" not in resp.content[:50]:
+                    r = resp
+                    found_dt = check
+                    break
+            except Exception:
+                continue
+        if not r:
+            raise FileNotFoundError(f"market_activity_report: no file found near {base}")
+        text = r.text
+
+        def _extract(label: str) -> str | None:
+            for line in text.splitlines():
+                if label.lower() in line.lower():
+                    parts = line.split(",")
+                    for p in reversed(parts):
+                        v = p.strip().replace(",", "")
+                        try:
+                            float(v)
+                            return v
+                        except ValueError:
+                            continue
+            return None
+
+        return {
+            "date":              found_dt.isoformat(),
+            "traded_value_cr":   _extract("Traded Value"),
+            "traded_qty_lakhs":  _extract("Traded Quantity"),
+            "num_trades":        _extract("Number of Trades"),
+            "market_cap_cr":     _extract("Market Capitalisation"),
+            "text":              text.strip(),
+        }
+
+    def series_changes(self) -> list[dict]:
+        """Recent series changes for NSE-listed securities (rolling file, no date param).
+
+        Returns: [{symbol, security, from_series, to_series, change_date, remarks}]
+        """
+        url = f"{_ARCHIVE}/content/equities/series_change.csv"
+        rows = _parse_csv_url(self._session, url)
+        out = []
+        for row in rows:
+            sym = (row.get("Symbol") or "").strip()
+            if not sym:
+                continue
+            out.append({
+                "symbol":      sym,
+                "security":    (row.get("Security") or "").strip(),
+                "from_series": (row.get("From Series") or "").strip(),
+                "to_series":   (row.get("To Series") or "").strip(),
+                "change_date": (row.get("Change Date") or "").strip(),
+                "remarks":     (row.get("Remarks") or "").strip(),
+            })
+        return out
+
+    def auction_securities(self, dt: date | None = None) -> dict:
+        """List of securities confirmed for auction on the given date.
+
+        NSE filename contains the settlement number (e.g. AUB_2026200_26102026.csv);
+        this method queries the daily-reports API to find the correct URL.
+
+        Returns: {settlement_ref, auction_date, securities: [{symbol, series, total_qty}]}
+        """
+        import re
+        dt = dt or date.today()
+        # Find the file URL via the daily-reports metadata API
+        try:
+            r_meta = self._session._s.get(
+                "https://www.nseindia.in/api/daily-reports?key=CM", timeout=15
+            )
+            data = r_meta.json()
+            items = data.get("CurrentDay", []) + data.get("PreviousDay", [])
+            aub_item = next(
+                (i for i in items if (i.get("fileActlName") or "").startswith("AUB_")),
+                None,
+            )
+            if aub_item:
+                file_url = aub_item["filePath"].rstrip("/") + "/" + aub_item["fileActlName"]
+                settlement_ref = re.search(r"AUB_(\d+)_", aub_item["fileActlName"])
+                settlement_ref = settlement_ref.group(1) if settlement_ref else ""
+            else:
+                settlement_ref = ""
+                file_url = None
+        except Exception:
+            file_url = None
+            settlement_ref = ""
+
+        if not file_url:
+            raise FileNotFoundError("Could not locate auction securities file via NSE API")
+
+        r = self._session._s.get(file_url, timeout=15)
+        r.raise_for_status()
+        lines = r.text.splitlines()
+        # First line is description, skip it; data starts after header "Sr No,Symbol,..."
+        header_idx = next((i for i, l in enumerate(lines) if l.startswith("Sr No,")), 1)
+        rows = _csv.DictReader(_io.StringIO("\n".join(lines[header_idx:])))
+        securities = []
+        for row in rows:
+            sym = (row.get("Symbol") or "").strip()
+            if not sym:
+                continue
+            try:
+                qty = int((row.get("Total Qty") or "0").strip().replace(",", "") or 0)
+            except ValueError:
+                qty = 0
+            securities.append({
+                "symbol":    sym,
+                "series":    (row.get("Series") or "").strip(),
+                "total_qty": qty,
+            })
+        return {
+            "settlement_ref": settlement_ref,
+            "auction_date":   dt.isoformat(),
+            "securities":     securities,
+        }
+
+    def stt_non_applicability(self, dt: date | None = None) -> list[dict]:
+        """STT Non-applicability Report — securities exempt from STT.
+
+        Returns: [{symbol, series, description, isin}]
+        """
+        base = dt or (date.today() - timedelta(days=1))
+        r = None
+        for offset in range(5):
+            check = base - timedelta(days=offset)
+            url = f"{_ARCHIVE}/content/equities/C_STT_{_ddmmyyyy(check)}.csv"
+            try:
+                resp = self._session._s.get(url, timeout=15)
+                if resp.status_code == 200 and b"DOCTYPE" not in resp.content[:50]:
+                    r = resp
+                    break
+            except Exception:
+                continue
+        if not r:
+            raise FileNotFoundError(f"stt_non_applicability: no file found near {base}")
+        # File starts with a blank line before the header row — skip empty lines
+        lines = [l for l in r.text.splitlines() if l.strip()]
+        reader = _csv.DictReader(_io.StringIO("\n".join(lines)))
+        out = []
+        for row in reader:
+            sym = (row.get("SYMBOL") or "").strip()
+            if not sym:
+                continue
+            out.append({
+                "symbol":      sym,
+                "series":      (row.get("SERIES") or "").strip(),
+                "description": (row.get("DESCRIPTION") or "").strip(),
+                "isin":        (row.get("ISIN") or "").strip(),
+            })
+        return out
+
+    def stt_equity_funds(self, dt: date | None = None) -> list[dict]:
+        """STT Equity Oriented Funds — mutual funds classified as equity-oriented for STT.
+
+        Returns: [{symbol, series, isin, sec_desc, stt_indicator}]
+        """
+        base = dt or (date.today() - timedelta(days=1))
+        r = None
+        for offset in range(5):
+            check = base - timedelta(days=offset)
+            url = f"{_ARCHIVE}/content/equities/C_STT_IND_{_ddmmyyyy(check)}.csv"
+            try:
+                resp = self._session._s.get(url, timeout=15)
+                if resp.status_code == 200 and b"DOCTYPE" not in resp.content[:50]:
+                    r = resp
+                    break
+            except Exception:
+                continue
+        if not r:
+            raise FileNotFoundError(f"stt_equity_funds: no file found near {base}")
+        rows = list(_csv.DictReader(_io.StringIO(r.text)))
+        out = []
+        for row in rows:
+            sym = (row.get("SYMBOL") or "").strip()
+            if not sym:
+                continue
+            out.append({
+                "symbol":        sym,
+                "series":        (row.get("SERIES") or "").strip(),
+                "isin":          (row.get("ISIN") or "").strip(),
+                "sec_desc":      (row.get("Sec Desc") or "").strip(),
+                "stt_indicator": (row.get("STT Indicator") or "").strip(),
+            })
+        return out
+
+    def circuit_square_off(self, dt: date | None = None) -> list[dict]:
+        """Circuit Square-off (CSQR) — securities squared off at circuit price.
+
+        Returns: [{symbol, series, settlement_type, settlement_no, price}]
+        """
+        import re
+        dt = dt or (date.today() - timedelta(days=1))
+        # Filename: CSQR_M{YYYY}{NNN}_{ddmmyyyy}.csv — settlement number via API
+        try:
+            r_meta = self._session._s.get(
+                "https://www.nseindia.in/api/daily-reports?key=CM", timeout=15
+            )
+            data = r_meta.json()
+            items = data.get("CurrentDay", []) + data.get("PreviousDay", [])
+            csqr_item = next(
+                (i for i in items if (i.get("fileActlName") or "").startswith("CSQR_")),
+                None,
+            )
+            if csqr_item:
+                file_url = csqr_item["filePath"].rstrip("/") + "/" + csqr_item["fileActlName"]
+            else:
+                file_url = None
+        except Exception:
+            file_url = None
+
+        if not file_url:
+            raise FileNotFoundError("Could not locate circuit square-off file via NSE API")
+
+        r = self._session._s.get(file_url, timeout=15)
+        r.raise_for_status()
+        out = []
+        for line in r.text.splitlines():
+            parts = [p.strip() for p in line.split(",")]
+            if len(parts) < 5:
+                continue
+            try:
+                out.append({
+                    "symbol":          parts[0],
+                    "series":          parts[1],
+                    "settlement_type": parts[2],
+                    "settlement_no":   parts[3],
+                    "price":           float(parts[4] or 0),
+                })
+            except (ValueError, IndexError):
+                continue
+        return out
+
+    def latency_statistics(self) -> dict:
+        """CM segment latency statistics — most recent published file (rolling).
+
+        Returns: {observation_date, rows: [{segment, min_us, mean_us, p50_us, p90_us,
+                   p99_us, max_us, order_messages}]}
+        """
+        # The file is not dated by today but by last available trading day;
+        # use the daily-reports API to get the exact filename.
+        try:
+            r_meta = self._session._s.get(
+                "https://www.nseindia.in/api/daily-reports?key=CM", timeout=15
+            )
+            data = r_meta.json()
+            items = data.get("CurrentDay", []) + data.get("PreviousDay", [])
+            lat_item = next(
+                (i for i in items if "latency" in (i.get("fileActlName") or "").lower()),
+                None,
+            )
+            if lat_item:
+                file_url = lat_item["filePath"].rstrip("/") + "/" + lat_item["fileActlName"]
+            else:
+                file_url = None
+        except Exception:
+            file_url = None
+
+        if not file_url:
+            raise FileNotFoundError("Could not locate latency statistics file via NSE API")
+
+        r = self._session._s.get(file_url, timeout=15)
+        r.raise_for_status()
+        lines = [l for l in r.text.splitlines() if l.strip()]
+        obs_date = ""
+        import re
+        m = re.search(r"'(\d{2}-[A-Z]{3}-\d{4})'", lines[0]) if lines else None
+        if m:
+            obs_date = m.group(1)
+        rows = []
+        if len(lines) > 1:
+            reader = _csv.DictReader(_io.StringIO("\n".join(lines[1:])))
+            for row in reader:
+                def _f(k): return float((row.get(k) or "0").strip().split("M")[0] or 0)
+                seg = (row.get("Segment") or "").strip()
+                if not seg:
+                    continue
+                rows.append({
+                    "segment":          seg,
+                    "min_us":           _f("Min"),
+                    "mean_us":          _f("Mean"),
+                    "p50_us":           _f("50%ile"),
+                    "p90_us":           _f("90%ile"),
+                    "p99_us":           _f("99%ile"),
+                    "max_us":           _f("Max"),
+                    "order_messages":   (row.get("No. of Order Messages (Million msgs)") or "").strip(),
+                })
+        return {"observation_date": obs_date, "rows": rows}
+
     def priceband_report(
         self,
         dt:     date | None = None,

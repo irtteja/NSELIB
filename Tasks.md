@@ -96,6 +96,18 @@ Format: `- [ ]` pending · `- [x]` done · `- [~]` blocked/deferred
 - [x] `priceband_changes(date)` — price band changes effective next trading day
 - [x] `sme_bhavcopy(date)` — SME segment daily OHLCV + 52-week H/L (~467 rows)
 - [x] `sme_price_band(date)` — SME segment complete price band list (~583 rows)
+- [x] `haircut_approved_securities(date)` — NSCCL haircut % for approved equities (~1000 rows)
+- [x] `haircut_mutual_funds(date)` — haircut for MF units accepted as collateral (~7000 rows)
+- [x] `haircut_all_approved(date)` — combined haircut for all approved securities (~9000 rows)
+- [x] `var_files(date)` — VaR margin data, 6 intraday snapshots merged (~113k rows)
+- [x] `corporate_bonds_traded(date)` — corporate bonds OHLCV traded on NSE (~159 rows)
+- [x] `market_activity_report(date)` — daily market summary stats (traded value, qty, trades, mkt cap)
+- [x] `series_changes()` — rolling file: recent EQ/BE/SM series changes (~16 rows)
+- [x] `auction_securities(date)` — securities confirmed for auction (uses daily-reports API for settlement no.)
+- [x] `stt_non_applicability(date)` — securities exempt from STT (~12800 rows)
+- [x] `stt_equity_funds(date)` — MF units classified as equity-oriented for STT (~1189 rows)
+- [x] `circuit_square_off(date)` — securities squared off at circuit price (~13900 rows)
+- [x] `latency_statistics()` — CM segment order latency percentiles (uses daily-reports API for filename)
 
 ## F&O module additions (fno.py)
 
