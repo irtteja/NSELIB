@@ -408,6 +408,7 @@ class FnoMixin:
         return []
 
     def combined_oi(self, trade_date: date | None = None) -> list[dict]:
+
         """
         Combined Open Interest across NSE + BSE for F&O eligible stocks.
         Shows MWPL utilization and whether fresh positions are blocked.
@@ -454,3 +455,320 @@ class FnoMixin:
             except Exception:
                 continue
         return []
+
+    # ------------------------------------------------------------------ #
+    #  F&O segment daily report files                                     #
+    # ------------------------------------------------------------------ #
+
+    def fo_settlement_prices(self, trade_date: date | None = None) -> list[dict]:
+        """Daily MTM settlement prices for all F&O contracts.
+
+        Returns: [{date, instrument, underlying, expiry, settlement_price}]
+        """
+        import csv as _c, io as _i
+        d = trade_date or date.today()
+        for offset in range(5):
+            check = d - timedelta(days=offset)
+            url = f"{_ARCHIVE}/archives/nsccl/sett/FOSett_prce_{check.strftime('%d%m%Y')}.csv"
+            try:
+                r = self._session._s.get(url, timeout=15)
+                if r.status_code == 200 and b"DOCTYPE" not in r.content[:50]:
+                    reader = _c.DictReader(_i.StringIO(r.text))
+                    out = []
+                    for row in reader:
+                        exp = (row.get("EXPIRY DATE") or "").strip()
+                        if not exp:
+                            continue
+                        try:
+                            out.append({
+                                "date":             (row.get("DATE") or "").strip(),
+                                "instrument":       (row.get("INSTRUMENT") or "").strip(),
+                                "underlying":       (row.get("UNDERLYING") or "").strip(),
+                                "expiry":           exp,
+                                "settlement_price": float((row.get("MTM SETTLEMENT PRICE") or "0").strip() or 0),
+                            })
+                        except (ValueError, TypeError):
+                            continue
+                    return out
+            except Exception:
+                continue
+        return []
+
+    def fo_daily_volatility(self, trade_date: date | None = None) -> list[dict]:
+        """EWMA daily and annualised volatility for F&O underlying stocks.
+
+        Returns: [{symbol, close, prev_close, log_return, prev_daily_vol,
+                   current_daily_vol, annualised_vol}]
+        """
+        import csv as _c, io as _i
+        d = trade_date or date.today()
+        for offset in range(5):
+            check = d - timedelta(days=offset)
+            url = f"{_ARCHIVE}/archives/nsccl/volt/FOVOLT_{check.strftime('%d%m%Y')}.csv"
+            try:
+                r = self._session._s.get(url, timeout=15)
+                if r.status_code == 200 and b"DOCTYPE" not in r.content[:50]:
+                    reader = _c.DictReader(_i.StringIO(r.text))
+                    cols = None
+                    out = []
+                    for row in reader:
+                        if cols is None:
+                            cols = list(row.keys())
+                        sym = (row.get(cols[1]) if len(cols) > 1 else "").strip()
+                        if not sym:
+                            continue
+                        def _f(idx, _cols=cols, _row=row):
+                            k = _cols[idx] if idx < len(_cols) else ""
+                            return float((_row.get(k) or "0").strip() or 0)
+                        try:
+                            out.append({
+                                "symbol":            sym,
+                                "close":             _f(2),
+                                "prev_close":        _f(3),
+                                "log_return":        _f(4),
+                                "prev_daily_vol":    _f(5),
+                                "current_daily_vol": _f(6),
+                                "annualised_vol":    _f(7),
+                            })
+                        except (ValueError, IndexError):
+                            continue
+                    return out
+            except Exception:
+                continue
+        return []
+
+    def fo_exposure_limits(self, trade_date: date | None = None) -> list[dict]:
+        """ELM (Extreme Loss Margin) and additional margin rates for F&O symbols.
+
+        Returns: [{symbol, instrument_type, normal_elm_pct, additional_elm_pct, total_elm_pct}]
+        """
+        import csv as _c, io as _i
+        d = trade_date or date.today()
+        for offset in range(5):
+            check = d - timedelta(days=offset)
+            url = f"{_ARCHIVE}/archives/exp_lim/ael_{check.strftime('%d%m%Y')}.csv"
+            try:
+                r = self._session._s.get(url, timeout=15)
+                if r.status_code == 200 and b"DOCTYPE" not in r.content[:50]:
+                    reader = _c.DictReader(_i.StringIO(r.text))
+                    out = []
+                    for row in reader:
+                        sym = (row.get("Symbol") or "").strip()
+                        if not sym:
+                            continue
+                        def _f(k, _row=row): return float((_row.get(k) or "0").strip() or 0)
+                        add_key = next((k for k in row if "Additional" in k), "")
+                        tot_key = next((k for k in row if "Total" in k), "")
+                        out.append({
+                            "symbol":             sym,
+                            "instrument_type":    (row.get("Instrument Type") or "").strip(),
+                            "normal_elm_pct":     _f("Normal ELM Margin%"),
+                            "additional_elm_pct": _f(add_key),
+                            "total_elm_pct":      _f(tot_key),
+                        })
+                    return out
+            except Exception:
+                continue
+        return []
+
+    def fo_delta_equivalent_oi(self, trade_date: date | None = None) -> list[dict]:
+        """Combined delta-equivalent Open Interest across NSE + BSE for F&O stocks.
+
+        Returns: [{date, isin, scrip_name, symbol, notional_oi, delta_eq_oi}]
+        """
+        import csv as _c, io as _i
+        d = trade_date or date.today()
+        for offset in range(5):
+            check = d - timedelta(days=offset)
+            url = f"{_ARCHIVE}/archives/nsccl/mwpl/combineoi_deleq_{check.strftime('%d%m%Y')}.csv"
+            try:
+                r = self._session._s.get(url, timeout=15)
+                if r.status_code == 200 and b"DOCTYPE" not in r.content[:50]:
+                    reader = _c.DictReader(_i.StringIO(r.text))
+                    out = []
+                    for row in reader:
+                        sym = (row.get("Symbol") or "").strip()
+                        if not sym:
+                            continue
+                        def _f(k, _row=row): return float((_row.get(k) or "0").replace(",", "") or 0)
+                        out.append({
+                            "date":        (row.get("Date") or "").strip(),
+                            "isin":        (row.get("ISIN") or "").strip(),
+                            "scrip_name":  (row.get("Scrip Name") or "").strip(),
+                            "symbol":      sym,
+                            "notional_oi": _f("Notional Open Interest"),
+                            "delta_eq_oi": _f("Portfolio-wise Futures Equivalent Open Interest"),
+                        })
+                    return out
+            except Exception:
+                continue
+        return []
+
+    def fo_contract_delta(self, trade_date: date | None = None) -> list[dict]:
+        """NCL delta factors per F&O contract for margin computation.
+
+        Returns: [{date, symbol, expiry, strike_price, option_type, delta_factor}]
+        """
+        import csv as _c, io as _i
+        d = trade_date or date.today()
+        for offset in range(5):
+            check = d - timedelta(days=offset)
+            url = f"{_ARCHIVE}/content/nsccl/Contract_Delta_{check.strftime('%d%m%Y')}.csv"
+            try:
+                r = self._session._s.get(url, timeout=15)
+                if r.status_code == 200 and b"DOCTYPE" not in r.content[:50]:
+                    reader = _c.DictReader(_i.StringIO(r.text))
+                    out = []
+                    for row in reader:
+                        sym = (row.get("Symbol") or "").strip()
+                        if not sym:
+                            continue
+                        try:
+                            out.append({
+                                "date":         (row.get("Date") or "").strip(),
+                                "symbol":       sym,
+                                "expiry":       (row.get("Expiry day") or "").strip(),
+                                "strike_price": float((row.get("Strike Price") or "0").strip() or 0),
+                                "option_type":  (row.get("Option Type") or "").strip(),
+                                "delta_factor": float((row.get("Delta Factor") or "0").strip() or 0),
+                            })
+                        except (ValueError, TypeError):
+                            continue
+                    return out
+            except Exception:
+                continue
+        return []
+
+    def fo_top10_clearing_members(self, trade_date: date | None = None) -> list[dict]:
+        """Top 10 clearing members by volume in equity derivatives.
+
+        Returns: [{rank, index_futures_vol, index_futures_trnvr, stock_futures_vol,
+                   stock_futures_trnvr, index_options_vol, stock_options_vol, total_vol, total_trnvr}]
+        """
+        import csv as _c, io as _i
+        d = trade_date or date.today()
+        for offset in range(5):
+            check = d - timedelta(days=offset)
+            url = f"{_ARCHIVE}/content/nsccl/fao_top10cm_to_{check.strftime('%d%m%Y')}.csv"
+            try:
+                r = self._session._s.get(url, timeout=15)
+                if r.status_code == 200 and b"DOCTYPE" not in r.content[:50]:
+                    lines = [l for l in r.text.splitlines() if l.strip()]
+                    if len(lines) < 2:
+                        continue
+                    reader = _c.DictReader(_i.StringIO("\n".join(lines[1:])))
+                    out = []
+                    rank = 0
+                    for row in reader:
+                        rank += 1
+                        def _f(k, _row=row):
+                            v = (_row.get(k) or "0").strip().replace(",", "")
+                            try: return float(v)
+                            except: return 0.0
+                        out.append({
+                            "rank":                rank,
+                            "index_futures_vol":   _f("Indx Futures Vol(Contracts)"),
+                            "index_futures_trnvr": _f("Index Futures Trnvr(Crores)"),
+                            "stock_futures_vol":   _f("Stock Futures Vol(Contracts)"),
+                            "stock_futures_trnvr": _f("Stock Futures Trnvr(Crores)"),
+                            "index_options_vol":   _f(next((k for k in row if "Index Options Vol" in k), "")),
+                            "index_options_trnvr": _f(next((k for k in row if "Index Options Trnvr" in k), "")),
+                            "stock_options_vol":   _f(next((k for k in row if "Stock Options Vol" in k), "")),
+                            "stock_options_trnvr": _f(next((k for k in row if "Stock Options Trnvr" in k), "")),
+                            "total_vol":           _f(next((k for k in row if "Total Vol" in k), "")),
+                            "total_trnvr":         _f(next((k for k in row if "Total Trnvr" in k), "")),
+                        })
+                    return out
+            except Exception:
+                continue
+        return []
+
+    def fo_index_position_limits(self, trade_date: date | None = None) -> list[dict]:
+        """Index derivatives position limits per category (FPI, MF, TM, clients).
+
+        Returns: [{index, instrument, qty_limit, category}]
+        """
+        import csv as _c, io as _i
+        d = trade_date or date.today()
+        for offset in range(5):
+            check = d - timedelta(days=offset)
+            url = f"{_ARCHIVE}/content/fo/Index_deriv_pos_limit_{check.strftime('%d%m%Y')}.csv"
+            try:
+                r = self._session._s.get(url, timeout=15)
+                if r.status_code == 200 and b"DOCTYPE" not in r.content[:50]:
+                    reader = _c.DictReader(_i.StringIO(r.text))
+                    out = []
+                    for row in reader:
+                        idx = (row.get("index") or "").strip()
+                        if not idx:
+                            continue
+                        try:
+                            out.append({
+                                "index":      idx,
+                                "instrument": (row.get("instrument") or "").strip(),
+                                "qty_limit":  int(float((row.get("qty_limit") or "0").strip() or 0)),
+                                "category":   (row.get("category") or "").strip(),
+                            })
+                        except (ValueError, TypeError):
+                            continue
+                    return out
+            except Exception:
+                continue
+        return []
+
+    def fo_market_activity(self, trade_date: date | None = None) -> dict:
+        """F&O Market Activity Report — complete futures and options bhavcopy.
+
+        Returns: {date, futures: [{instrument, symbol, expiry, open, high, low, close,
+                                   oi, traded_value, traded_qty, num_contracts, num_trades}],
+                         options: [{..., strike, option_type, notional_value, premium_value}]}
+        """
+        import csv as _c, io as _i, zipfile as _zf
+        d = trade_date or date.today()
+        for offset in range(5):
+            check = d - timedelta(days=offset)
+            url = f"{_ARCHIVE}/archives/fo/mkt/fo{check.strftime('%d%m%Y')}.zip"
+            try:
+                r = self._session._s.get(url, timeout=30)
+                if r.status_code == 200 and b"DOCTYPE" not in r.content[:50]:
+                    ds = check.strftime('%d%m%Y')
+                    with _zf.ZipFile(_i.BytesIO(r.content)) as zf:
+                        def _read_csv(fname):
+                            try:
+                                text = zf.read(fname).decode("utf-8", errors="replace")
+                                return list(_c.DictReader(_i.StringIO(text)))
+                            except Exception:
+                                return []
+
+                        def _clean(rows, renames):
+                            out = []
+                            for row in rows:
+                                # Strip whitespace from keys AND values; coerce None to ""
+                                c = {k.strip(): (v.strip() if isinstance(v, str) else (v or ""))
+                                     for k, v in row.items() if k and k.strip()}
+                                c = {renames.get(k, k): v for k, v in c.items()}
+                                if c.get("symbol", ""):
+                                    out.append(c)
+                            return out
+
+                        fut_renames = {
+                            "INSTRUMENT": "instrument", "SYMBOL": "symbol",
+                            "EXP_DATE": "expiry", "OPEN_PRICE": "open",
+                            "HI_PRICE": "high", "LO_PRICE": "low",
+                            "CLOSE_PRICE": "close", "OPEN_INT*": "oi",
+                            "TRD_VAL": "traded_value", "TRD_QTY": "traded_qty",
+                            "NO_OF_CONT": "num_contracts", "NO_OF_TRADE": "num_trades",
+                        }
+                        opt_renames = dict(fut_renames)
+                        opt_renames.update({
+                            "STR_PRICE": "strike", "OPT_TYPE": "option_type",
+                            "NOTION_VAL": "notional_value", "PR_VAL": "premium_value",
+                        })
+                        return {
+                            "date":    check.isoformat(),
+                            "futures": _clean(_read_csv(f"fo{ds}.csv"), fut_renames),
+                            "options": _clean(_read_csv(f"op{ds}.csv"), opt_renames),
+                        }
+            except Exception:
+                continue
+        return {"date": None, "futures": [], "options": []}

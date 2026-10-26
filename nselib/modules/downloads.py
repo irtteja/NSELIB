@@ -262,6 +262,42 @@ class DownloadsMixin:
                 continue
         return out
 
+    def securities_list(self, dt: date | None = None) -> list[dict]:
+        """Complete list of securities with their trading series, price band, and surveillance remarks.
+
+        Published daily; includes all series (EQ, BE, BZ, ST, etc.) with GSM/ASM flags.
+
+        Returns: [{symbol, series, security_name, band, remarks}]
+        """
+        base = dt or (date.today() - timedelta(days=1))
+        r = None
+        for offset in range(5):
+            check = base - timedelta(days=offset)
+            url = f"{_ARCHIVE}/content/equities/sec_list_{_ddmmyyyy(check)}.csv"
+            try:
+                resp = self._session._s.get(url, timeout=15)
+                if resp.status_code == 200 and b"DOCTYPE" not in resp.content[:50]:
+                    r = resp
+                    break
+            except Exception:
+                continue
+        if not r:
+            raise FileNotFoundError(f"securities_list: no file found near {base}")
+        reader = _csv.DictReader(_io.StringIO(r.text))
+        out = []
+        for row in reader:
+            sym = (row.get("Symbol") or "").strip()
+            if not sym:
+                continue
+            out.append({
+                "symbol":        sym,
+                "series":        (row.get("Series") or "").strip(),
+                "security_name": (row.get("Security Name") or "").strip(),
+                "band":          (row.get("Band") or "").strip(),
+                "remarks":       (row.get("Remarks") or "").strip().strip('"'),
+            })
+        return out
+
     def priceband_changes(self, dt: date | None = None) -> list[dict]:
         """
         Price band changes effective from the next trading date.

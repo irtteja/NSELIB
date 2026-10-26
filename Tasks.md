@@ -108,6 +108,18 @@ Format: `- [ ]` pending · `- [x]` done · `- [~]` blocked/deferred
 - [x] `stt_equity_funds(date)` — MF units classified as equity-oriented for STT (~1189 rows)
 - [x] `circuit_square_off(date)` — securities squared off at circuit price (~13900 rows)
 - [x] `latency_statistics()` — CM segment order latency percentiles (uses daily-reports API for filename)
+- [x] `securities_list(date)` — all listed securities with series, price band, GSM/ASM remarks (~3598 rows)
+
+## F&O module daily report files (fno.py)
+
+- [x] `fo_settlement_prices(date)` — MTM settlement prices for all F&O contracts (~1316 rows)
+- [x] `fo_daily_volatility(date)` — EWMA volatility for F&O underlyings (~224 rows)
+- [x] `fo_exposure_limits(date)` — ELM + additional margin % per symbol/instrument (~426 rows)
+- [x] `fo_delta_equivalent_oi(date)` — combined delta-equivalent OI across NSE+BSE (~222 rows)
+- [x] `fo_contract_delta(date)` — NCL delta factors per F&O contract (~149k rows)
+- [x] `fo_top10_clearing_members(date)` — top 10 clearing members by equity derivatives volume
+- [x] `fo_index_position_limits(date)` — index derivatives position limits per investor category (~30 rows)
+- [x] `fo_market_activity(date)` — complete F&O bhavcopy: futures (650 rows) + options (21626 rows)
 
 ## F&O module additions (fno.py)
 
