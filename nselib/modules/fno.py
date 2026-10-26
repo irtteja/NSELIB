@@ -772,3 +772,206 @@ class FnoMixin:
             except Exception:
                 continue
         return {"date": None, "futures": [], "options": []}
+
+    def fo_latency_statistics(self, trade_date: date | None = None) -> list[dict]:
+        """FO segment order latency percentiles (microseconds).
+
+        Uses daily-reports API to resolve the exact filename (published for last
+        trading day). Returns one row per segment with latency stats.
+        """
+        import csv as _c, io as _i
+        base = trade_date or (date.today() - timedelta(days=1))
+        for offset in range(5):
+            check = base - timedelta(days=offset)
+            if check.weekday() >= 5:
+                continue
+            ds = check.strftime("%d%m%Y")
+            url = f"{_ARCHIVE}/content/FO_Latency_stats{ds}.csv"
+            try:
+                r = self._session._s.get(url, timeout=15)
+                if r.status_code == 200 and b"DOCTYPE" not in r.content[:50]:
+                    lines = [l for l in r.text.splitlines() if l.strip()]
+                    if len(lines) < 2:
+                        continue
+                    reader = _c.DictReader(_i.StringIO("\n".join(lines[1:])))
+                    out = []
+                    for row in reader:
+                        seg = (row.get("Segment") or "").strip()
+                        if not seg or len(seg) > 10:
+                            continue
+                        out.append({
+                            "segment":            seg,
+                            "min_us":             (row.get("Min") or "").strip(),
+                            "mean_us":            (row.get("Mean") or "").strip(),
+                            "p50_us":             (row.get("50%ile") or "").strip(),
+                            "p90_us":             (row.get("90%ile") or "").strip(),
+                            "p99_us":             (row.get("99%ile") or "").strip(),
+                            "max_us":             (row.get("Max") or "").strip(),
+                            "order_messages":     (row.get("No. of Order Messages (Million msgs)") or "").strip(),
+                        })
+                    if out:
+                        return out
+            except Exception:
+                continue
+        return []
+
+    def fo_client_oi_limits(self, trade_date: date | None = None) -> list[dict]:
+        """Client-wise position limits for F&O stocks (contracts per client per exchange).
+
+        Returns [{symbol, client_limit, exchange}] — shows the maximum net OI a
+        single client may hold in that stock's futures/options.
+        """
+        import csv as _c, io as _i
+        base = trade_date or date.today()
+        for offset in range(5):
+            check = base - timedelta(days=offset)
+            if check.weekday() >= 5:
+                continue
+            ds = check.strftime("%d-%b-%Y").upper()
+            url = f"{_ARCHIVE}/content/nsccl/oi_cli_limit_{ds}.lst"
+            try:
+                r = self._session._s.get(url, timeout=15)
+                if r.status_code == 200 and b"DOCTYPE" not in r.content[:50]:
+                    reader = _c.DictReader(_i.StringIO(r.text))
+                    out = []
+                    for row in reader:
+                        sym = (row.get("SYMBOL") or "").strip()
+                        if not sym:
+                            continue
+                        out.append({
+                            "symbol":       sym,
+                            "client_limit": (row.get("CLIENT_LIMIT") or "").strip(),
+                            "exchange":     (row.get("EXCHANGE") or "").strip(),
+                        })
+                    if out:
+                        return out
+            except Exception:
+                continue
+        return []
+
+    def fo_contracts(self, trade_date: date | None = None) -> list[dict]:
+        """NSE F&O contract master file — all active contracts with lot size, ISIN, expiry.
+
+        Returns key fields from the MII contract file (NSE-exclusive contracts).
+        ~5000+ rows covering all futures and options contracts.
+        """
+        import gzip as _gz, csv as _c, io as _i
+        base = trade_date or date.today()
+        for offset in range(5):
+            check = base - timedelta(days=offset)
+            if check.weekday() >= 5:
+                continue
+            ds = check.strftime("%d%m%Y")
+            url = f"{_ARCHIVE}/content/fo/NSE_FO_contract_{ds}.csv.gz"
+            try:
+                r = self._session._s.get(url, timeout=60)
+                if r.status_code == 200 and b"DOCTYPE" not in r.content[:50]:
+                    with _gz.open(_i.BytesIO(r.content)) as f:
+                        text = f.read().decode("utf-8", errors="replace")
+                    reader = _c.DictReader(_i.StringIO(text))
+                    out = []
+                    for row in reader:
+                        sym = (row.get("TckrSymb") or "").strip()
+                        if not sym:
+                            continue
+                        out.append({
+                            "instrument_id":  (row.get("FinInstrmId") or "").strip(),
+                            "symbol":         sym,
+                            "name":           (row.get("FinInstrmNm") or "").strip(),
+                            "expiry_epoch":   (row.get("XpryDt") or "").strip(),
+                            "strike":         (row.get("StrkPric") or "").strip(),
+                            "option_type":    (row.get("OptnTp") or "").strip(),
+                            "lot_size":       (row.get("NewBrdLotQty") or "").strip(),
+                            "instrument_type": (row.get("FinInstrmTp") or "").strip(),
+                            "isin":           (row.get("ISIN") or "").strip(),
+                            "settlement":     (row.get("SttlmMtd") or "").strip(),
+                            "permitted":      (row.get("PrtdToTrad") or "").strip(),
+                        })
+                    if out:
+                        return out
+            except Exception:
+                continue
+        return []
+
+    def fo_spread_contracts(self, trade_date: date | None = None) -> list[dict]:
+        """NSE F&O spread contract definitions (calendar spreads between expiries).
+
+        Returns [{symbol, near_leg_id, far_leg_id, ref_price, price_range_low, price_range_high}].
+        """
+        import gzip as _gz, csv as _c, io as _i
+        base = trade_date or date.today()
+        for offset in range(5):
+            check = base - timedelta(days=offset)
+            if check.weekday() >= 5:
+                continue
+            ds = check.strftime("%d%m%Y")
+            url = f"{_ARCHIVE}/content/fo/NSE_FO_spdcontract_{ds}.csv.gz"
+            try:
+                r = self._session._s.get(url, timeout=30)
+                if r.status_code == 200 and b"DOCTYPE" not in r.content[:50]:
+                    with _gz.open(_i.BytesIO(r.content)) as f:
+                        text = f.read().decode("utf-8", errors="replace")
+                    reader = _c.DictReader(_i.StringIO(text))
+                    out = []
+                    for row in reader:
+                        sym = (row.get("TckrSymb1") or "").strip()
+                        if not sym:
+                            continue
+                        out.append({
+                            "symbol":           sym,
+                            "near_leg_id":      (row.get("FinInstrmIdLeg1") or "").strip(),
+                            "far_leg_id":       (row.get("FinInstrmIdLeg2") or "").strip(),
+                            "near_expiry":      (row.get("XpryDt1") or "").strip(),
+                            "far_expiry":       (row.get("XpryDt2") or "").strip(),
+                            "lot_size":         (row.get("NewBrdLotQty1") or "").strip(),
+                            "ref_price":        (row.get("RefPric") or "").strip(),
+                            "price_range_low":  (row.get("DayLwPricDiffRg") or "").strip(),
+                            "price_range_high": (row.get("DayHghPricDiffRg") or "").strip(),
+                            "eligible":         (row.get("Elgblty") or "").strip(),
+                        })
+                    if out:
+                        return out
+            except Exception:
+                continue
+        return []
+
+    def fo_ael_option_contracts(self, trade_date: date | None = None) -> list[dict]:
+        """Contract-wise Additional Exposure Limit (AEL) for F&O option contracts.
+
+        Returns [{instrument, symbol, expiry, strike, option_type, buy_elm_pct, sell_elm_pct}].
+        No-header CSV — columns inferred from NSE documentation.
+        """
+        import gzip as _gz, csv as _c, io as _i
+        base = trade_date or date.today()
+        for offset in range(5):
+            check = base - timedelta(days=offset)
+            if check.weekday() >= 5:
+                continue
+            ds = check.strftime("%d%m%Y")
+            url = f"{_ARCHIVE}/content/fo/F_AEL_OPT_CONTRACTS_{ds}.csv.gz"
+            try:
+                r = self._session._s.get(url, timeout=30)
+                if r.status_code == 200 and b"DOCTYPE" not in r.content[:50]:
+                    with _gz.open(_i.BytesIO(r.content)) as f:
+                        text = f.read().decode("utf-8", errors="replace")
+                    out = []
+                    for row in _c.reader(_i.StringIO(text)):
+                        if len(row) < 7:
+                            continue
+                        instrument = row[0].strip()
+                        if not instrument or instrument.startswith("#"):
+                            continue
+                        out.append({
+                            "instrument":   instrument,
+                            "symbol":       row[1].strip(),
+                            "expiry":       row[2].strip(),
+                            "strike":       row[3].strip(),
+                            "option_type":  row[4].strip(),
+                            "buy_elm_pct":  row[5].strip(),
+                            "sell_elm_pct": row[6].strip(),
+                        })
+                    if out:
+                        return out
+            except Exception:
+                continue
+        return []

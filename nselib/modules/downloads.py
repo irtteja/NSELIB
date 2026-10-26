@@ -1043,3 +1043,182 @@ class DownloadsMixin:
         if not filename:
             filename = url.rstrip("/").split("/")[-1] or "document"
         return self._session.download_file(url, folder=Path(folder), filename=filename)
+
+    def wdm_securities_list(self, dt: date | None = None) -> list[dict]:
+        """Debt segment (WDM) — complete list of securities available for trading.
+
+        Includes government securities, corporate bonds, T-bills, state loans, etc.
+        Returns [{sectype, symbol, issue_name, issue_desc, coupon_pct, issue_date,
+                  mat_date, last_ip_dt, next_ip_dt, cpn_freq, last_traded_date,
+                  last_traded_price, isin, status}].
+        ~6000+ rows.
+        """
+        import csv as _csv2, io as _io2
+        base = dt or date.today()
+        for offset in range(5):
+            check = base - timedelta(days=offset)
+            if check.weekday() >= 5:
+                continue
+            ds = check.strftime("%d%m%Y")
+            yr = check.strftime("%Y")
+            mn = check.strftime("%b").upper()
+            url = f"{_ARCHIVE}/content/historical/WDM/{yr}/{mn}/wdmlist_{ds}.csv"
+            try:
+                r = self._session._s.get(url, timeout=20)
+                if r.status_code == 200 and b"DOCTYPE" not in r.content[:50]:
+                    reader = _csv2.DictReader(_io2.StringIO(r.text))
+                    out = []
+                    for row in reader:
+                        sym = (row.get("SECURITY") or "").strip()
+                        if not sym:
+                            continue
+                        out.append({
+                            "sectype":           (row.get("SECTYPE") or "").strip(),
+                            "symbol":            sym,
+                            "issue_name":        (row.get("ISSUE_NAME") or "").strip(),
+                            "issue_desc":        (row.get("ISSUE_DESC") or "").strip(),
+                            "issue_date":        (row.get("ISSUE_DATE") or "").strip(),
+                            "mat_date":          (row.get("MAT_DATE") or "").strip(),
+                            "last_ip_dt":        (row.get("Last IP Dt") or "").strip(),
+                            "next_ip_dt":        (row.get("Next IP Dt") or "").strip(),
+                            "cpn_freq":          (row.get("Cpn Freq") or "").strip(),
+                            "last_traded_date":  (row.get("Last Traded Date") or "").strip(),
+                            "last_traded_price": (row.get("Last Traded Price (in Rs.)") or "").strip(),
+                            "isin":              (row.get("ISIN NO.") or "").strip(),
+                            "status":            (row.get("STATUS") or "").strip(),
+                        })
+                    if out:
+                        return out
+            except Exception:
+                continue
+        return []
+
+    def wdm_daily_report(self, dt: date | None = None) -> dict:
+        """Debt segment (WDM) daily trade report.
+
+        Returns {date, trades: [{trade_date, sectype, symbol, issue_name, settl_days,
+                trade_type, num_trades, traded_value_cr, low, high, last, vwap, wtd_ytm}],
+                additions: [{sectype, symbol, issue, issue_desc, coupon, issue_date,
+                             mat_date, next_ip_date, cpn_freq, rating, listed}],
+                maturities: list}.
+        Zip contains settlement CSV + additions/maturities CSVs.
+        """
+        import csv as _csv2, io as _io2, zipfile as _zf
+        base = dt or date.today()
+        for offset in range(5):
+            check = base - timedelta(days=offset)
+            if check.weekday() >= 5:
+                continue
+            ds = check.strftime("%d%m%Y")
+            ddmm = check.strftime("%d%m")
+            url = f"{_ARCHIVE}/content/debt/dly{ds}.zip"
+            try:
+                r = self._session._s.get(url, timeout=30)
+                if r.status_code == 200 and b"DOCTYPE" not in r.content[:50]:
+                    with _zf.ZipFile(_io2.BytesIO(r.content)) as z:
+                        names = z.namelist()
+
+                        # Trade settlement CSV
+                        sett_name = next((n for n in names if n.startswith("trd") and n.endswith("_sett.csv")), None)
+                        trades = []
+                        if sett_name:
+                            text = z.read(sett_name).decode("utf-8", errors="replace")
+                            reader = _csv2.DictReader(_io2.StringIO(text))
+                            for row in reader:
+                                sym = (row.get("Security") or "").strip()
+                                if not sym:
+                                    continue
+                                trades.append({
+                                    "trade_date":      (row.get("Trade date") or "").strip(),
+                                    "sectype":         (row.get("Sectype") or "").strip(),
+                                    "symbol":          sym,
+                                    "issue_name":      (row.get("Issue Name") or "").strip(),
+                                    "settl_days":      (row.get("Settl Days") or "").strip(),
+                                    "trade_type":      (row.get("Trade Type") or "").strip(),
+                                    "num_trades":      (row.get("No.of Trades") or "").strip(),
+                                    "traded_value_cr": (row.get("Traded Value (Rs.Cr.)") or "").strip(),
+                                    "low":             (row.get("Low Price/Rate") or "").strip(),
+                                    "high":            (row.get("High Price/Rate") or "").strip(),
+                                    "last":            (row.get("Last Traded Price/Rate") or "").strip(),
+                                    "vwap":            (row.get("Value Weighted Average Price/Rate") or "").strip(),
+                                    "wtd_ytm":         (row.get("Weighted YTM") or "").strip(),
+                                })
+
+                        def _parse_csv_z(name_prefix):
+                            nm = next((n for n in names if n.startswith(name_prefix) and n.endswith(".csv")), None)
+                            if not nm:
+                                return []
+                            text = z.read(nm).decode("utf-8", errors="replace")
+                            lines = [l for l in text.splitlines() if l.strip()]
+                            if not lines:
+                                return []
+                            # Skip first line if it looks like a title (not a proper header)
+                            if lines[0].startswith(",,,"):
+                                lines = lines[1:]
+                            reader = _csv2.DictReader(_io2.StringIO("\n".join(lines)))
+                            out = []
+                            for row in reader:
+                                sym2 = (row.get("Security") or "").strip()
+                                if not sym2:
+                                    continue
+                                out.append({k.strip(): (v or "").strip() for k, v in row.items() if k and k.strip()})
+                            return out
+
+                        return {
+                            "date":       check.isoformat(),
+                            "trades":     trades,
+                            "additions":  _parse_csv_z("add"),
+                            "maturities": _parse_csv_z("mat"),
+                        }
+            except Exception:
+                continue
+        return {"date": None, "trades": [], "additions": [], "maturities": []}
+
+    def egr_var_files(self, dt: date | None = None) -> list[dict]:
+        """EGR segment (Exchange for Gold Receipts) VaR margin files.
+
+        Merges all 6 intraday VaR snapshots (begin-day through 5th intra-day).
+        Same format as CM var_files: record type 10 = header row, 20 = data row.
+        Returns [{snapshot, date, symbol, segment, isin, prev_daily_vol,
+                  current_daily_vol, annualised_vol, price_band_pct}].
+        """
+        import io as _io2
+        base = dt or date.today()
+        for offset in range(5):
+            check = base - timedelta(days=offset)
+            if check.weekday() >= 5:
+                continue
+            ds = check.strftime("%d%m%Y")
+            rows = []
+            found_any = False
+            for snap in range(1, 7):
+                url = f"{_ARCHIVE}/content/egr/E_VAR1_{ds}_{snap}.DAT"
+                try:
+                    r = self._session._s.get(url, timeout=15)
+                    if r.status_code != 200 or b"DOCTYPE" in r.content[:50]:
+                        continue
+                    found_any = True
+                    for line in r.text.splitlines():
+                        parts = line.split(",")
+                        if not parts or parts[0] != "20":
+                            continue
+                        if len(parts) < 10:
+                            continue
+                        rows.append({
+                            "snapshot":        snap,
+                            "date":            ds,
+                            "symbol":          parts[1].strip(),
+                            "segment":         parts[2].strip(),
+                            "isin":            parts[3].strip(),
+                            "prev_daily_vol":  parts[4].strip(),
+                            "daily_vol_added": parts[5].strip(),
+                            "price_band_pct":  parts[6].strip(),
+                            "current_daily_vol": parts[7].strip(),
+                            "annualised_vol":  parts[8].strip(),
+                            "var_pct":         parts[9].strip(),
+                        })
+                except Exception:
+                    continue
+            if found_any:
+                return rows
+        return []

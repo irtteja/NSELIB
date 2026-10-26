@@ -120,6 +120,20 @@ Format: `- [ ]` pending · `- [x]` done · `- [~]` blocked/deferred
 - [x] `fo_top10_clearing_members(date)` — top 10 clearing members by equity derivatives volume
 - [x] `fo_index_position_limits(date)` — index derivatives position limits per investor category (~30 rows)
 - [x] `fo_market_activity(date)` — complete F&O bhavcopy: futures (650 rows) + options (21626 rows)
+- [x] `fo_latency_statistics(date)` — FO segment order latency percentiles (microseconds)
+- [x] `fo_client_oi_limits(date)` — client-wise position limits per stock per exchange (~648 rows)
+- [x] `fo_contracts(date)` — NSE F&O contract master file — all active contracts with lot size, ISIN (~88k rows, .gz)
+- [x] `fo_spread_contracts(date)` — calendar spread contract definitions with price ranges (~440 rows, .gz)
+- [x] `fo_ael_option_contracts(date)` — contract-wise AEL/ELM for all option contracts (~149k rows, .gz)
+
+## WDM (debt) module daily report files (downloads.py)
+
+- [x] `wdm_securities_list(date)` — all WDM-listed securities: G-Secs, bonds, T-bills (~10624 rows)
+- [x] `wdm_daily_report(date)` — debt segment daily report: trades, new issues added, maturities (zip)
+
+## EGR (Exchange for Gold Receipts) daily report files (downloads.py)
+
+- [x] `egr_var_files(date)` — EGR segment VaR margin files, 6 snapshots merged (~72 rows)
 
 ## F&O module additions (fno.py)
 

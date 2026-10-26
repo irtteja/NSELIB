@@ -4,6 +4,33 @@ Newest entries at top.
 
 ---
 
+## 2026-10-26 (session 4)
+
+### Complete coverage of FO, WDM, EGR segment daily report files
+
+Queried `NSE_API_IN/daily-reports?key=FO|WDM|EGR` to enumerate all files. Added 5 new FO methods to `fno.py` and 3 new WDM/EGR methods to `downloads.py`. All cloud-safe (archive-based), all use 5-day retry loop.
+
+**FO segment additions (fno.py):**
+- `fo_latency_statistics(date)` — FO segment order latency percentiles in microseconds; uses daily-reports API to resolve filename (published for previous trading day); filters out the disclaimer note row
+- `fo_client_oi_limits(date)` — client-wise F&O position limits per stock per exchange (~648 rows); filename uses `DD-MON-YYYY` format
+- `fo_contracts(date)` — NSE F&O contract master from `NSE_FO_contract_{ddmmyyyy}.csv.gz` (~88k rows); key fields: instrument_id, symbol, name, expiry_epoch, strike, option_type, lot_size, settlement, permitted
+- `fo_spread_contracts(date)` — calendar spread contract pairs from `NSE_FO_spdcontract_{ddmmyyyy}.csv.gz` (~440 rows); near/far leg IDs, ref price, day price ranges
+- `fo_ael_option_contracts(date)` — contract-wise AEL/ELM from `F_AEL_OPT_CONTRACTS_{ddmmyyyy}.csv.gz` (~149k rows); no-header CSV, 7 cols: instrument, symbol, expiry, strike, option_type, buy_elm_pct, sell_elm_pct
+
+**WDM (debt) segment additions (downloads.py):**
+- `wdm_securities_list(date)` — all WDM-listed securities from `content/historical/WDM/{YYYY}/{MON}/wdmlist_{ddmmyyyy}.csv` (~10624 rows); includes G-Secs, PSU bonds, T-bills, state loans, CPs; columns: sectype, symbol, issue_name, coupon, dates, ISIN, status
+- `wdm_daily_report(date)` — debt segment daily trade report from `content/debt/dly{ddmmyyyy}.zip`; zip contains settlement CSV (trades with OHLCV + YTM), additions CSV (new issues listed), maturities CSV; returns `{date, trades, additions, maturities}`
+
+**EGR (Exchange for Gold Receipts) segment additions (downloads.py):**
+- `egr_var_files(date)` — VaR margin files from `content/egr/E_VAR1_{ddmmyyyy}_{1-6}.DAT`; same record format as CM var_files (type 10=header, type 20=data); 6 snapshots merged (~72 rows); columns: snapshot, date, symbol, segment, isin, prev/current daily vol, price band pct, var pct
+
+**Skipped (not feasible):**
+- SPAN zip files (binary SPAN format, requires specialized parser)
+- `FNO_BC*.DAT`, `dmr*.docx` (binary formats)
+- `mwpl_cli*.xls` (requires xlrd/openpyxl)
+
+---
+
 ## 2026-10-26 (session 3)
 
 ### Added all remaining Equities & SME daily report methods to downloads.py
