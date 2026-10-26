@@ -527,7 +527,299 @@ class Guardian:
         return best
 
     # ------------------------------------------------------------------ #
-    #  Discover                                                            #
+    #  Discover — archive files (daily-reports API)                       #
+    # ------------------------------------------------------------------ #
+
+    _ARCHIVE_SEGMENTS = ("CM", "FO", "WDM", "EGR")
+    _SKIP_EXTENSIONS  = {".dat", ".doc", ".docx", ".xls", ".xlsx"}
+
+    def discover_archive(
+        self,
+        segments: tuple[str, ...] | None = None,
+        nselib_dir: str | Path | None = None,
+    ) -> list[dict]:
+        """
+        Discover NSE daily-report archive files not yet implemented in nselib.
+
+        Pipeline:
+          1. Query NSE_API_IN/api/daily-reports?key=<seg> for each segment
+          2. For each file, check if the URL path signature already appears
+             anywhere in the module source (= covered) or not (= new)
+          3. For each new file, download a sample to understand the format
+          4. Ask Brain to generate the full archive method using the
+             standard 5-day retry pattern
+          5. Record discoveries so apply() + verify() can handle them
+
+        Returns the same list[dict] format as discover() so apply() can
+        run the combined results without knowing which source they came from.
+        """
+        import gzip as _gz
+        import io as _io2
+        import zipfile as _zf
+
+        segs    = segments or self._ARCHIVE_SEGMENTS
+        base_in = "https://www.nseindia.in/api"
+        modules_dir = (
+            Path(nselib_dir) / "nselib" / "modules"
+            if nselib_dir
+            else Path(__file__).parent / "modules"
+        )
+
+        # Build one big string of all module source to search for coverage
+        module_source = ""
+        for f in modules_dir.glob("*.py"):
+            try:
+                module_source += f.read_text()
+            except Exception:
+                pass
+
+        discoveries: list[dict] = []
+
+        for seg in segs:
+            print(f"[Guardian/archive] Checking segment {seg}…")
+            try:
+                r = self._session._s.get(
+                    f"{base_in}/daily-reports?key={seg}", timeout=15
+                )
+                if r.status_code != 200:
+                    print(f"[Guardian/archive] {seg}: HTTP {r.status_code}")
+                    continue
+                data = r.json()
+            except Exception as exc:
+                print(f"[Guardian/archive] {seg}: fetch error — {exc}")
+                continue
+
+            files = data.get("CurrentDay", []) or data.get("PreviousDay", [])
+
+            for item in files:
+                filename  = item.get("fileActlName", "")
+                file_path = item.get("filePath", "").rstrip("/")
+                display   = item.get("displayName", "")
+                full_url  = f"{file_path}/{filename}"
+
+                if not filename or not file_path:
+                    continue
+
+                # Skip known-binary formats and SPAN files (proprietary binary)
+                suffix = Path(filename).suffix.lower()
+                if suffix in self._SKIP_EXTENSIONS:
+                    continue
+                if "span" in display.lower() or "span" in filename.lower():
+                    continue
+
+                # Coverage check — the most reliable signal is the archive
+                # directory path, which appears verbatim in every method's URL
+                # f-string. Strip the host to get the path, then check whether
+                # the directory portion appears anywhere in the module source.
+                import re as _re
+                host = "https://nsearchives.nseindia.com"
+                arch_path = full_url.replace(host, "")           # e.g. /archives/nsccl/sett/FOSett_prce_26102026.csv
+                arch_dir  = arch_path.rsplit("/", 1)[0]          # e.g. /archives/nsccl/sett
+                # Also check the file name prefix (invariant part before first date run)
+                file_prefix = _re.split(r"\d{6,}", filename)[0]  # e.g. "FOSett_prce_"
+
+                # Covered if the full archive directory path appears in source,
+                # OR if a long file prefix (>=6 chars) appears in source.
+                covered = (
+                    (len(arch_dir) >= 8 and arch_dir.lower() in module_source.lower())
+                    or (len(file_prefix) >= 6 and file_prefix.lower() in module_source.lower())
+                )
+                if covered:
+                    continue
+
+                print(f"[Guardian/archive]   NEW: {display} ({filename})")
+
+                # Sample the file to understand its format
+                sample_text = self._sample_archive_file(full_url, suffix)
+                if sample_text is None:
+                    print(f"[Guardian/archive]   skipping {filename} — could not download sample")
+                    continue
+
+                # Determine which module it belongs to
+                module = self._archive_module_for(seg, display, filename)
+
+                # Ask Brain to generate the method
+                method_code, method_name = self._generate_archive_method(
+                    full_url, filename, file_path, display, seg, module, sample_text
+                )
+                if not method_code or not method_name:
+                    print(f"[Guardian/archive]   Brain returned no code for {filename}")
+                    continue
+
+                disc = {
+                    "path":        full_url,
+                    "module":      module,
+                    "method_name": method_name,
+                    "method_code": method_code,
+                    "_source":     "archive",
+                    "_display":    display,
+                }
+                discoveries.append(disc)
+                print(f"[Guardian/archive]   Generated: {method_name}() → {module}.py")
+
+        with self._lock:
+            self._discoveries.extend(discoveries)
+
+        self._log(
+            "discover_archive",
+            segments=list(segs),
+            new_methods=[d["method_name"] for d in discoveries],
+        )
+        return discoveries
+
+    def _sample_archive_file(self, url: str, suffix: str) -> str | None:
+        """Download up to 3 KB of an archive file; decompress if needed."""
+        import gzip as _gz, io as _io2, zipfile as _zf
+        try:
+            r = self._session._s.get(url, timeout=30, stream=True)
+            if r.status_code != 200 or b"DOCTYPE" in r.content[:50]:
+                return None
+            raw = r.content[:65536]  # at most 64 KB
+            if suffix == ".gz":
+                try:
+                    with _gz.open(_io2.BytesIO(raw)) as f:
+                        return f.read(3000).decode("utf-8", errors="replace")
+                except Exception:
+                    return None
+            if suffix == ".zip":
+                try:
+                    with _zf.ZipFile(_io2.BytesIO(raw)) as z:
+                        names = [n for n in z.namelist() if n.endswith(".csv")]
+                        if not names:
+                            return None
+                        return z.read(names[0])[:3000].decode("utf-8", errors="replace")
+                except Exception:
+                    return None
+            return raw[:3000].decode("utf-8", errors="replace")
+        except Exception:
+            return None
+
+    def _archive_module_for(self, seg: str, display: str, filename: str) -> str:
+        dl = display.lower()
+        fn = filename.lower()
+        if seg in ("WDM",):
+            return "downloads"
+        if seg in ("EGR",):
+            return "downloads"
+        if "haircut" in dl or "var" in dl or "margin" in dl or "surveillance" in dl:
+            return "downloads"
+        if "bhavcopy" in dl or "bhav" in fn or "pe ratio" in dl or "week52" in dl:
+            return "downloads"
+        if "participant" in dl or "ban" in dl or "mwpl" in dl or "oi" in dl:
+            return "fno"
+        if "settlement" in dl or "volatility" in dl or "exposure" in dl or "delta" in dl:
+            return "fno"
+        if "latency" in dl:
+            return "fno" if seg == "FO" else "downloads"
+        if "market activity" in dl or "turnover" in dl:
+            return "fno" if seg == "FO" else "market"
+        if "contract" in dl or "spread" in dl or "option" in dl:
+            return "fno"
+        if seg == "FO":
+            return "fno"
+        return "downloads"
+
+    def _generate_archive_method(
+        self,
+        full_url: str,
+        filename: str,
+        file_path: str,
+        display: str,
+        seg: str,
+        module: str,
+        sample: str,
+    ) -> tuple[str, str]:
+        """Ask Brain to write the archive method. Returns (code, name)."""
+        import re as _re
+
+        # Extract URL pattern by replacing date digits with a placeholder
+        pattern_url = _re.sub(r"\d{8}", "{ddmmyyyy}", full_url)
+        pattern_url = _re.sub(r"\d{6}", "{ddmmyy}", pattern_url)
+        pattern_url = _re.sub(
+            r"\d{2}-[A-Z]{3}-\d{4}", "{DD-MON-YYYY}", pattern_url
+        )
+
+        reference = '''    def fo_settlement_prices(self, trade_date: date | None = None) -> list[dict]:
+        """Daily MTM settlement prices for all F&O contracts."""
+        import csv as _c, io as _i
+        d = trade_date or date.today()
+        for offset in range(5):
+            check = d - timedelta(days=offset)
+            if check.weekday() >= 5:
+                continue
+            url = f"{_ARCHIVE}/archives/nsccl/sett/FOSett_prce_{check.strftime('%d%m%Y')}.csv"
+            try:
+                r = self._session._s.get(url, timeout=15)
+                if r.status_code == 200 and b"DOCTYPE" not in r.content[:50]:
+                    reader = _c.DictReader(_i.StringIO(r.text))
+                    out = []
+                    for row in reader:
+                        sym = (row.get("UNDERLYING") or "").strip()
+                        if not sym:
+                            continue
+                        out.append({
+                            "date":             (row.get("DATE") or "").strip(),
+                            "instrument":       (row.get("INSTRUMENT") or "").strip(),
+                            "underlying":       sym,
+                            "expiry":           (row.get("EXPIRY DATE") or "").strip(),
+                            "settlement_price": (row.get("MTM SETTLEMENT PRICE") or "").strip(),
+                        })
+                    return out
+            except Exception:
+                continue
+        return []'''
+
+        prompt = f"""You are generating a Python method for the nselib library to fetch an NSE India archive file.
+
+NSE file metadata:
+  Display name : {display}
+  Segment      : {seg}
+  Full URL     : {full_url}
+  URL pattern  : {pattern_url}
+  Target module: {module}
+
+First 3000 bytes of the actual file:
+```
+{sample[:2000]}
+```
+
+Reference pattern (use this exact structure — do NOT use self._session.get(), always use self._session._s.get()):
+```python
+{reference}
+```
+
+Rules:
+1. Use `self._session._s.get(url, timeout=15)` — never `self._session.get()`.
+2. Always add `if check.weekday() >= 5: continue` inside the retry loop.
+3. Always check `b"DOCTYPE" not in r.content[:50]` before parsing.
+4. For .gz files: `import gzip as _gz; with _gz.open(io.BytesIO(r.content)) as f: text = f.read().decode()`
+5. For .zip files: `import zipfile as _zf; with _zf.ZipFile(io.BytesIO(r.content)) as z:` — list files, read CSVs.
+6. For no-header CSVs: use `csv.reader` and assign column names manually.
+7. Build the URL by replacing the date in the pattern URL above. Use `check.strftime()`.
+8. Use `_ARCHIVE = "https://nsearchives.nseindia.com"` — it's already defined at module level.
+9. The method parameter should be `dt: date | None = None` for CM/WDM/EGR or `trade_date: date | None = None` for FO.
+10. Return `[]` or `{{}}` on failure — never raise.
+11. Strip every string value: `(row.get("COL") or "").strip()`.
+12. Choose a descriptive snake_case method name that doesn't already exist.
+
+Reply with ONLY a JSON object:
+{{"method_name": "snake_case_name", "method_code": "def method_name(self, ...):\\n    ..."}}
+"""
+        raw = self._brain.ask(prompt)
+        parsed = self._parse_json(raw)
+        if not isinstance(parsed, dict):
+            return "", ""
+        name = (parsed.get("method_name") or "").strip()
+        code = (parsed.get("method_code") or "").strip()
+        if not name or not code:
+            return "", ""
+        # strip markdown fences if Brain wrapped them
+        import re as _re
+        code = _re.sub(r"^```python\s*|^```\s*|```$", "", code, flags=_re.MULTILINE).strip()
+        return code, name
+
+    # ------------------------------------------------------------------ #
+    #  Discover — live API endpoints                                       #
     # ------------------------------------------------------------------ #
 
     def discover(self, focus: str | None = None) -> list[dict]:
@@ -658,12 +950,14 @@ class Guardian:
                 print(f"[Guardian] '{d['method_name']}' already exists in {module}.py — skipping.")
                 continue
 
-            # Guarantee Guardian wrapping — replace any bare _session.get calls
-            # with the guarded version so self-healing applies from day one.
-            code = code.replace(
-                "self._session.get(",
-                "(self._guardian.guarded_get if self._guardian else self._session.get)(",
-            )
+            # Archive methods use self._session._s.get() directly (intentional —
+            # bypasses Akamai check, uses retry loop internally).
+            # Only wrap bare self._session.get() calls (live API) with guarded_get.
+            if d.get("_source") != "archive":
+                code = code.replace(
+                    "self._session.get(",
+                    "(self._guardian.guarded_get if self._guardian else self._session.get)(",
+                )
 
             indented = "\n    ".join(code.splitlines())
             updated  = current.rstrip("\n") + f"\n\n    {indented}\n"
@@ -671,7 +965,8 @@ class Guardian:
             modified.append(str(target))
             self._log("apply", method=d.get("method_name"),
                       module=module, path=d.get("path"))
-            print(f"[Guardian] Added '{d.get('method_name')}' to {module}.py (guardian-wrapped)")
+            src_tag = " (archive)" if d.get("_source") == "archive" else " (guardian-wrapped)"
+            print(f"[Guardian] Added '{d.get('method_name')}' to {module}.py{src_tag}")
 
         if self._discoveries:
             print(f"[Guardian] Verifying {len(self._discoveries)} new method(s)…")
@@ -828,15 +1123,16 @@ class Guardian:
 
         return results
 
-    def watch(self, interval: int = 3600) -> None:
+    def watch(self, interval: int = 3600, nselib_dir: str | Path | None = None) -> None:
         """
-        Run discover() in a background thread every `interval` seconds.
-        New endpoints are printed; call apply() manually to write them.
+        Run discover() + discover_archive() in a background thread every
+        `interval` seconds. New endpoints are printed; call apply() to write them.
         """
         def _loop():
             while True:
                 time.sleep(interval)
-                found = self.discover()
+                found  = self.discover()
+                found += self.discover_archive(nselib_dir=nselib_dir)
                 if found:
                     names = [d.get("method_name", d.get("path")) for d in found]
                     print(f"[Guardian] New methods ready to apply: {names}")
