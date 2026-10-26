@@ -360,3 +360,97 @@ class FnoMixin:
             "total_pe_oi":  pe_oi,
             "pcr":          round(pe_oi / ce_oi, 3) if ce_oi else None,
         }
+
+    def mwpl_oi(self, trade_date: date | None = None) -> list[dict]:
+        """
+        Market-Wide Position Limit (MWPL) utilization — NCL Open Interest.
+        Stocks shown are those near or above MWPL (candidates for F&O ban).
+
+        Each dict: date, isin, scrip_name, symbol, mwpl, ncl_oi, ncl_futeq_oi
+
+        Published after market close. Defaults to most recent available trading day.
+        """
+        import csv as _csv2, io as _io2
+        from datetime import timedelta
+        d = trade_date or date.today()
+        for offset in range(5):
+            check = d - timedelta(days=offset)
+            url = (
+                f"{_ARCHIVE}/archives/nsccl/mwpl/"
+                f"ncloi_{check.strftime('%d%m%Y')}.zip"
+            )
+            try:
+                import zipfile as _zf, io as _zipio
+                r = self._session._s.get(url, timeout=10)
+                if r.status_code == 200 and b"DOCTYPE" not in r.content[:50]:
+                    with _zf.ZipFile(_zipio.BytesIO(r.content)) as zf:
+                        csv_file = next(n for n in zf.namelist() if n.endswith(".csv"))
+                        text = zf.read(csv_file).decode("utf-8", errors="replace")
+                    reader = _csv2.DictReader(_io2.StringIO(text))
+                    out = []
+                    for row in reader:
+                        clean = {k.strip(): v.strip() for k, v in row.items()}
+                        try:
+                            out.append({
+                                "date":         clean.get("Date", ""),
+                                "isin":         clean.get("ISIN", ""),
+                                "scrip_name":   clean.get("Scrip Name", ""),
+                                "symbol":       clean.get("NSE Symbol", ""),
+                                "mwpl":         float(clean.get("MWPL", 0) or 0),
+                                "ncl_oi":       float(clean.get("NCL Open Interest", "0").replace(",", "") or 0),
+                                "ncl_futeq_oi": float(clean.get("NCL FutEq OI", "0").replace(",", "") or 0),
+                            })
+                        except (ValueError, KeyError):
+                            continue
+                    return out
+            except Exception:
+                continue
+        return []
+
+    def combined_oi(self, trade_date: date | None = None) -> list[dict]:
+        """
+        Combined Open Interest across NSE + BSE for F&O eligible stocks.
+        Shows MWPL utilization and whether fresh positions are blocked.
+
+        Each dict: date, isin, scrip_name, symbol, mwpl, open_interest,
+                   futeq_oi, limit_next_day ('No Fresh Positions' or '')
+
+        Published after market close. Defaults to most recent available trading day.
+        """
+        import csv as _csv2, io as _io2
+        from datetime import timedelta
+        d = trade_date or date.today()
+        for offset in range(5):
+            check = d - timedelta(days=offset)
+            url = (
+                f"{_ARCHIVE}/archives/nsccl/mwpl/"
+                f"combineoi_{check.strftime('%d%m%Y')}.zip"
+            )
+            try:
+                import zipfile as _zf, io as _zipio
+                r = self._session._s.get(url, timeout=10)
+                if r.status_code == 200 and b"DOCTYPE" not in r.content[:50]:
+                    with _zf.ZipFile(_zipio.BytesIO(r.content)) as zf:
+                        csv_file = next(n for n in zf.namelist() if n.endswith(".csv"))
+                        text = zf.read(csv_file).decode("utf-8", errors="replace")
+                    reader = _csv2.DictReader(_io2.StringIO(text))
+                    out = []
+                    for row in reader:
+                        clean = {k.strip(): v.strip() for k, v in row.items()}
+                        try:
+                            out.append({
+                                "date":           clean.get("Date", ""),
+                                "isin":           clean.get("ISIN", ""),
+                                "scrip_name":     clean.get("Scrip Name", ""),
+                                "symbol":         clean.get("NSE Symbol", ""),
+                                "mwpl":           float(clean.get("MWPL", 0) or 0),
+                                "open_interest":  float(clean.get("Open Interest", "0").replace(",", "") or 0),
+                                "futeq_oi":       float(clean.get("Future Equivalent Open Interest", "0").replace(",", "") or 0),
+                                "limit_next_day": clean.get("Limit for Next Day", ""),
+                            })
+                        except (ValueError, KeyError):
+                            continue
+                    return out
+            except Exception:
+                continue
+        return []

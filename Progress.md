@@ -6,6 +6,30 @@ Newest entries at top.
 
 ## 2026-10-26 (continued)
 
+### Added margin_trading_disclosure, mwpl_oi, combined_oi from zip file inspection
+
+Inspected all zip files in NSE daily reports (CM + FO segments). Found 3 new relevant zip files:
+
+- **`mrg_trading_DDMMYY.zip`** (`content/equities/`) — SEBI Margin Trading Disclosure
+  - `margin_trading_disclosure(date)` added to downloads.py
+  - Returns `{date, summary{4 totals in Rs.Lakhs}, scrips[2215 rows: symbol, name, qty_shares, amt_lakhs]}`
+  - Uses 5-day retry loop (skips weekends like participant_oi/fno_ban_list)
+  - 2-digit year in filename (`%d%m%y`)
+
+- **`ncloi_DDMMYYYY.zip`** (`archives/nsccl/mwpl/`) — NCL Open Interest (MWPL utilization)
+  - `mwpl_oi(trade_date)` added to fno.py
+  - 213 rows: date, ISIN, scrip_name, symbol, mwpl, ncl_oi, ncl_futeq_oi
+  - Today's data: 17 stocks at/above MWPL (ban zone candidates)
+
+- **`combineoi_DDMMYYYY.zip`** (`archives/nsccl/mwpl/`) — Combined OI across NSE+BSE
+  - `combined_oi(trade_date)` added to fno.py
+  - 213 rows: same + open_interest, futeq_oi, limit_next_day ('No Fresh Positions' if banned)
+  - Today: AMBUJACEM, KAYNES, SAIL banned (No Fresh Positions)
+
+Also inspected `fo.zip` (rolling F&O bhavcopy) — contains `fo_{ddmmyy}.csv` (654 futures rows) + `op_{ddmmyy}.csv` (39560 options rows with OHLCV+OI per contract).
+
+---
+
 ### Fixed bugs and added 7 equity-research archive methods to downloads.py
 
 **Bugs fixed:**

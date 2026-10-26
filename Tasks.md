@@ -91,6 +91,12 @@ Format: `- [ ]` pending · `- [x]` done · `- [~]` blocked/deferred
 - [x] `surveillance_indicator(date)` — GSM/ASM/IRP flags per stock (~3211 rows)
 - [x] `bulk_deals_archive()` — today's bulk deals, rolling cloud-safe file
 - [x] `block_deals_archive()` — today's block deals, rolling cloud-safe file
+- [x] `margin_trading_disclosure(date)` — scrip-wise margin financing data + summary (2215 scrips)
+
+## F&O module additions (fno.py)
+
+- [x] `mwpl_oi(trade_date)` — NCL Open Interest / MWPL utilization (213 rows, flags ban-zone stocks)
+- [x] `combined_oi(trade_date)` — Combined OI across NSE+BSE; shows which stocks have "No Fresh Positions"
 
 ## Health-check agent (healthcheck.py)
 

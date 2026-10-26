@@ -250,6 +250,83 @@ class DownloadsMixin:
         url = f"{_ARCHIVE}/content/equities/block.csv"
         return _parse_csv_url(self._session, url)
 
+    def margin_trading_disclosure(self, dt: date | None = None) -> dict:
+        """
+        SEBI margin trading disclosure for a given date.
+        Published for previous trading day. Uses 2-digit year format.
+
+        Returns dict with:
+          'date'    : reporting date string
+          'summary' : {total_outstanding_start, fresh_exposure, exposure_liquidated,
+                       net_outstanding_end}  — all in Rs. Lakhs
+          'scrips'  : list of dicts {symbol, name, qty_shares, amt_lakhs}
+        """
+        import zipfile as _zipfile
+        base = dt or (date.today() - timedelta(days=1))
+        raw = None
+        for offset in range(5):
+            check = base - timedelta(days=offset)
+            url = f"{_ARCHIVE}/content/equities/mrg_trading_{_ddmmyy(check)}.zip"
+            try:
+                r = self._session._s.get(url, timeout=15)
+                if r.status_code == 200 and b"DOCTYPE" not in r.content[:50]:
+                    with _zipfile.ZipFile(_io.BytesIO(r.content)) as zf:
+                        raw = zf.read(zf.namelist()[0]).decode("utf-8", errors="replace")
+                    break
+            except Exception:
+                continue
+        if raw is None:
+            return {"date": "", "summary": {}, "scrips": []}
+
+        lines = raw.splitlines()
+        report_date = lines[0].split("Reporting date")[-1].strip().rstrip(",").strip()
+
+        # Summary rows: lines 3-6 have Sr.No., Particulars, Rs. In Lakhs
+        summary_keys = [
+            "total_outstanding_start",
+            "fresh_exposure",
+            "exposure_liquidated",
+            "net_outstanding_end",
+        ]
+        summary: dict = {}
+        summary_idx = 0
+        for line in lines[3:9]:
+            parts = [p.strip() for p in line.split(",")]
+            if parts[0].isdigit() and summary_idx < 4:
+                try:
+                    summary[summary_keys[summary_idx]] = float(parts[2])
+                except (ValueError, IndexError):
+                    pass
+                summary_idx += 1
+
+        # Scrip data: find header row, then read CSV from there
+        scrip_start = next(
+            (i for i, l in enumerate(lines) if l.startswith("Symbol,")), None
+        )
+        scrips: list[dict] = []
+        if scrip_start is not None:
+            reader = _csv.DictReader(_io.StringIO("\n".join(lines[scrip_start:])))
+            for row in reader:
+                sym = (row.get("Symbol") or "").strip()
+                if not sym:
+                    continue
+                try:
+                    qty = int(row.get("Qty Fin by all the members(No.of Shares)", "0").replace(",", "") or 0)
+                except ValueError:
+                    qty = 0
+                try:
+                    amt = float(row.get("Amt Fin by all the members(Rs. In Lakhs)", "0").replace(",", "") or 0)
+                except ValueError:
+                    amt = 0.0
+                scrips.append({
+                    "symbol": sym,
+                    "name":   (row.get("Name") or "").strip(),
+                    "qty_shares": qty,
+                    "amt_lakhs":  amt,
+                })
+
+        return {"date": report_date, "summary": summary, "scrips": scrips}
+
     # ------------------------------------------------------------------ #
     #  Daily reports                                                       #
     # ------------------------------------------------------------------ #
