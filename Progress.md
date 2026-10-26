@@ -4,6 +4,31 @@ Newest entries at top.
 
 ---
 
+## 2026-10-26 (session 5)
+
+### Ran HealthChecker full cycle; fixed Guardian holiday-404 loop; fixed 3 weekend-broken methods
+
+**healthcheck.py:**
+- Added 22 new entries to `_REGISTRY`: all archive methods added in sessions 3-4 (fo_latency_statistics, fo_client_oi_limits, fo_contracts, fo_spread_contracts, fo_market_activity, fo_daily_volatility, fo_exposure_limits, fo_delta_equivalent_oi, fo_top10_clearing_members, fo_index_position_limits, fo_settlement_prices, fo_spread_contracts, mwpl_oi, combined_oi, wdm_securities_list, egr_var_files, full_bhavcopy_delivery, pe_ratio, week52_high_low, short_selling, surveillance_indicator, latency_statistics, securities_list, daily_volatility, sme_bhavcopy, sme_price_band, etc.)
+- Updated `_run_discovery()` to call `g.discover_archive(nselib_dir=nselib_dir)` after the live-API `g.discover()` call — fulfills the intent: archive coverage check runs automatically on every health cycle
+
+**Health cycle Step 1-3 results (run on 2026-10-26, Monday):**
+- Tested 57 registered methods
+- 49 ok, 5 cloud-blocked (expected), 3 broken (weekend 404 — no file on Sat/Sun), 4 auto-healed by Guardian (bhavcopy weekend rollback)
+- `discover_archive()` reported 0 new archive methods (complete coverage)
+- `discover()` found 8 new live endpoints, 1 new method added (`live_variations_gainers`)
+
+**Guardian fix — holiday 404 loop:**
+- Root cause: `guarded_archive()` called `_heal_archive_url()` for EVERY 404, including expected holiday 404s during bhavcopy backfill (Nov 5 Guru Nanak, Dec 25 Christmas, Jan 26 Republic Day, Mar 3 Holi, Mar 26 Ram Navami, Apr 3 Good Friday, etc.)
+- Fix: added `_url_date_is_historical(url)` static method (>7 days → historical → holiday 404) + short-circuit in `guarded_archive()` to `raise` without calling Brain on historical 404s
+
+**downloads.py — fixed 3 weekend-broken methods:**
+- `week52_high_low` — added 5-day retry loop (skip weekends, try 404, move back)
+- `short_selling` — same fix
+- `surveillance_indicator` — same fix
+
+---
+
 ## 2026-10-26 (session 4)
 
 ### Complete coverage of FO, WDM, EGR segment daily report files

@@ -89,9 +89,41 @@ _REGISTRY: dict[str, tuple[tuple, dict]] = {
         "from_date": date.today() - timedelta(days=30),
         "to_date":   date.today(),
     }),
-    # downloads
+    # downloads — archive
     "equity_bhavcopy":           ((), {}),
+    "delivery_bhavcopy":         ((), {}),
+    "fno_bhavcopy":              ((), {}),
     "indices_bhavcopy":          ((), {}),
+    "full_bhavcopy_delivery":    ((), {}),
+    "pe_ratio":                  ((), {}),
+    "week52_high_low":           ((), {}),
+    "short_selling":             ((), {}),
+    "surveillance_indicator":    ((), {}),
+    "bulk_deals_archive":        ((), {}),
+    "block_deals_archive":       ((), {}),
+    "margin_trading_disclosure": ((), {}),
+    "daily_volatility":          ((), {}),
+    "priceband_changes":         ((), {}),
+    "sme_bhavcopy":              ((), {}),
+    "sme_price_band":            ((), {}),
+    "latency_statistics":        ((), {}),
+    "securities_list":           ((), {}),
+    "wdm_securities_list":       ((), {}),
+    "egr_var_files":             ((), {}),
+    # fno — daily report archive methods
+    "fo_settlement_prices":      ((), {}),
+    "fo_daily_volatility":       ((), {}),
+    "fo_exposure_limits":        ((), {}),
+    "fo_delta_equivalent_oi":    ((), {}),
+    "fo_top10_clearing_members": ((), {}),
+    "fo_index_position_limits":  ((), {}),
+    "fo_market_activity":        ((), {}),
+    "fo_latency_statistics":     ((), {}),
+    "fo_client_oi_limits":       ((), {}),
+    "fo_spread_contracts":       ((), {}),
+    "fo_contracts":              ((), {}),
+    "mwpl_oi":                   ((), {}),
+    "combined_oi":               ((), {}),
 }
 
 # Methods known to be blocked from cloud/datacenter IPs — expected, not bugs
@@ -307,7 +339,16 @@ class HealthChecker:
         if not g:
             return {"skipped": True, "reason": "no guardian"}
 
+        # Live API discovery (Claude-assisted endpoint guessing)
         discoveries = g.discover()
+
+        # Archive discovery (ground-truth daily-reports API)
+        try:
+            arch_discoveries = g.discover_archive(nselib_dir=nselib_dir)
+            discoveries = discoveries + arch_discoveries
+        except Exception as exc:
+            print(f"[HealthChecker]  ⚠ discover_archive error: {exc}")
+
         if not discoveries:
             print("[HealthChecker]  No new endpoints found.")
             return {"new_endpoints": 0, "applied": 0,

@@ -146,6 +146,8 @@ Format: `- [ ]` pending · `- [x]` done · `- [~]` blocked/deferred
 - [x] `HealthChecker.run(nselib_dir)` — one-shot full cycle, returns + writes JSON report
 - [x] `HealthChecker.watch(interval, nselib_dir)` — background daemon thread
 - [x] `HealthChecker.last_report()` — load most recent saved report
+- [x] `_REGISTRY` updated with all archive methods (22 new entries: fo/wdm/egr/downloads methods)
+- [x] `_run_discovery` updated to call `discover_archive(nselib_dir)` in addition to `discover()`
 - [ ] Expose `nse.health_check()` convenience wrapper on NSE class
 - [ ] Add `HealthChecker` to `nselib/__init__.py` exports
 

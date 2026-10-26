@@ -50,55 +50,94 @@ class DownloadsMixin:
     # ------------------------------------------------------------------ #
 
     def equity_bhavcopy(
-        self,
-        dt:     date | None = None,
-        folder: str | Path  = ".",
-    ) -> Path:
-        """
-        Download the equity bhavcopy CSV for a given date.
-        dt defaults to yesterday. Returns the saved file path.
-        """
-        dt = dt or (date.today() - timedelta(days=1))
-        filename = f"BhavCopy_NSE_CM_0_0_0_{dt.strftime('%Y%m%d')}_F_0000.csv.zip"
-        url = f"{_ARCHIVE}/content/cm/{filename}"
-        _dl = lambda u: self._session.download_zip(u, folder=Path(folder))
-        return self._guardian.guarded_archive(url, _dl) if self._guardian else _dl(url)
+                self,
+                dt:     date | None = None,
+                folder: str | Path  = ".",
+            ) -> Path:
+            """
+            Download the equity bhavcopy CSV for a given date.
+            dt defaults to yesterday. Weekends roll back to the previous weekday.
+            Exchange holidays (e.g. Holi 03-Mar-2026) have no file and return 404,
+            so the download falls back up to 7 prior weekdays until one is found.
+            Returns the saved file path.
+            """
+            dt = dt or (date.today() - timedelta(days=1))
+    
+            def _prev_weekday(d):
+                d -= timedelta(days=1)
+                while d.weekday() >= 5:
+                    d -= timedelta(days=1)
+                return d
+    
+            while dt.weekday() >= 5:
+                dt -= timedelta(days=1)
+    
+            def _dl(first_url):
+                d, last_err = dt, None
+                for _ in range(8):
+                    filename = f"BhavCopy_NSE_CM_0_0_0_{d.strftime('%Y%m%d')}_F_0000.csv.zip"
+                    try:
+                        return self._session.download_zip(f"{_ARCHIVE}/content/cm/{filename}", folder=Path(folder))
+                    except Exception as e:
+                        last_err = e
+                        d = _prev_weekday(d)
+                raise last_err
+    
+            filename = f"BhavCopy_NSE_CM_0_0_0_{dt.strftime('%Y%m%d')}_F_0000.csv.zip"
+            url = f"{_ARCHIVE}/content/cm/{filename}"
+            return self._guardian.guarded_archive(url, _dl) if self._guardian else _dl(url)
 
     def delivery_bhavcopy(
-        self,
-        dt:     date | None = None,
-        folder: str | Path  = ".",
-    ) -> Path:
-        """Delivery position bhavcopy (MTO/delivery data)."""
-        dt = dt or (date.today() - timedelta(days=1))
-        filename = f"MTO_{_ddmmyyyy(dt)}.DAT"
-        url = f"{_ARCHIVE}/archives/equities/mto/{filename}"
-        _dl = lambda u: self._session.download_file(u, folder=Path(folder), filename=filename)
-        return self._guardian.guarded_archive(url, _dl) if self._guardian else _dl(url)
+            self,
+            dt:     date | None = None,
+            folder: str | Path  = ".",
+        ) -> Path:
+            """Delivery position bhavcopy (MTO/delivery data)."""
+            dt = dt or (date.today() - timedelta(days=1))
+            # NSE publishes no file on weekends or exchange holidays; roll back to the last day with a file
+            for _ in range(10):
+                while dt.weekday() >= 5:
+                    dt -= timedelta(days=1)
+                filename = f"MTO_{_ddmmyyyy(dt)}.DAT"
+                url = f"{_ARCHIVE}/archives/equities/mto/{filename}"
+                probe = self._session._s.get(url, stream=True)
+                status = probe.status_code
+                probe.close()
+                if status == 404:
+                    dt -= timedelta(days=1)
+                    continue
+                _dl = lambda u: self._session.download_file(u, folder=Path(folder), filename=filename)
+                return self._guardian.guarded_archive(url, _dl) if self._guardian else _dl(url)
+            raise FileNotFoundError("No MTO delivery file found in the last 10 days")
 
     def fno_bhavcopy(
-        self,
-        dt:     date | None = None,
-        folder: str | Path  = ".",
-    ) -> Path:
-        """F&O bhavcopy CSV."""
-        dt = dt or (date.today() - timedelta(days=1))
-        filename = f"BhavCopy_NSE_FO_0_0_0_{dt.strftime('%Y%m%d')}_F_0000.csv.zip"
-        url = f"{_ARCHIVE}/content/fo/{filename}"
-        _dl = lambda u: self._session.download_zip(u, folder=Path(folder))
-        return self._guardian.guarded_archive(url, _dl) if self._guardian else _dl(url)
+            self,
+            dt:     date | None = None,
+            folder: str | Path  = ".",
+        ) -> Path:
+            """F&O bhavcopy CSV."""
+            dt = dt or (date.today() - timedelta(days=1))
+            # NSE publishes no bhavcopy on weekends; step back to the last weekday
+            while dt.weekday() >= 5:
+                dt -= timedelta(days=1)
+            filename = f"BhavCopy_NSE_FO_0_0_0_{dt.strftime('%Y%m%d')}_F_0000.csv.zip"
+            url = f"{_ARCHIVE}/content/fo/{filename}"
+            _dl = lambda u: self._session.download_zip(u, folder=Path(folder))
+            return self._guardian.guarded_archive(url, _dl) if self._guardian else _dl(url)
 
     def indices_bhavcopy(
-        self,
-        dt:     date | None = None,
-        folder: str | Path  = ".",
-    ) -> Path:
-        """Index daily values bhavcopy CSV."""
-        dt = dt or (date.today() - timedelta(days=1))
-        filename = f"ind_close_all_{_ddmmyyyy(dt)}.csv"
-        url = f"{_ARCHIVE}/content/indices/{filename}"
-        _dl = lambda u: self._session.download_file(u, folder=Path(folder), filename=filename)
-        return self._guardian.guarded_archive(url, _dl) if self._guardian else _dl(url)
+            self,
+            dt:     date | None = None,
+            folder: str | Path  = ".",
+        ) -> Path:
+            """Index daily values bhavcopy CSV."""
+            dt = dt or (date.today() - timedelta(days=1))
+            while dt.weekday() >= 5:
+                dt -= timedelta(days=1)
+            filename = f"ind_close_all_{_ddmmyyyy(dt)}.csv"
+            url = f"{_ARCHIVE}/content/indices/{filename}"
+            _dl = lambda u: self._session.download_file(u, folder=Path(folder), filename=filename)
+            return self._guardian.guarded_archive(url, _dl) if self._guardian else _dl(url)
 
     def pr_bhavcopy(
         self,
@@ -197,14 +236,21 @@ class DownloadsMixin:
         dt defaults to yesterday.
         """
         dt = dt or (date.today() - timedelta(days=1))
-        url = f"{_ARCHIVE}/content/CM_52_wk_High_low_{_ddmmyyyy(dt)}.csv"
-        r = self._session._s.get(url, timeout=15)
-        r.raise_for_status()
-        lines = r.text.splitlines()
-        # First 2 lines are disclaimer text, not CSV header
-        data_text = "\n".join(lines[2:])
-        reader = _csv.DictReader(_io.StringIO(data_text))
-        return [row for row in reader]
+        for i in range(5):
+            check = dt - timedelta(days=i)
+            if check.weekday() >= 5:
+                continue
+            url = f"{_ARCHIVE}/content/CM_52_wk_High_low_{_ddmmyyyy(check)}.csv"
+            r = self._session._s.get(url, timeout=15)
+            if r.status_code == 404 or (len(r.content) > 10 and b"DOCTYPE" in r.content[:200]):
+                continue
+            r.raise_for_status()
+            lines = r.text.splitlines()
+            # First 2 lines are disclaimer text, not CSV header
+            data_text = "\n".join(lines[2:])
+            reader = _csv.DictReader(_io.StringIO(data_text))
+            return [row for row in reader]
+        raise FileNotFoundError("No 52-week high/low file found in the last 5 trading days")
 
     def short_selling(self, dt: date | None = None) -> list[dict]:
         """
@@ -214,8 +260,18 @@ class DownloadsMixin:
         dt defaults to yesterday.
         """
         dt = dt or (date.today() - timedelta(days=1))
-        url = f"{_ARCHIVE}/archives/equities/shortSelling/shortselling_{_ddmmyyyy(dt)}.csv"
-        return _parse_csv_url(self._session, url)
+        for i in range(5):
+            check = dt - timedelta(days=i)
+            if check.weekday() >= 5:
+                continue
+            url = f"{_ARCHIVE}/archives/equities/shortSelling/shortselling_{_ddmmyyyy(check)}.csv"
+            r = self._session._s.get(url, timeout=15)
+            if r.status_code == 404 or (len(r.content) > 10 and b"DOCTYPE" in r.content[:200]):
+                continue
+            r.raise_for_status()
+            reader = _csv.DictReader(_io.StringIO(r.text))
+            return [row for row in reader]
+        raise FileNotFoundError("No short selling file found in the last 5 trading days")
 
     def surveillance_indicator(self, dt: date | None = None) -> list[dict]:
         """
@@ -227,8 +283,18 @@ class DownloadsMixin:
         dt defaults to yesterday.
         """
         dt = dt or (date.today() - timedelta(days=1))
-        url = f"{_ARCHIVE}/content/cm/REG_IND{_ddmmyy(dt)}.csv"
-        return _parse_csv_url(self._session, url)
+        for i in range(5):
+            check = dt - timedelta(days=i)
+            if check.weekday() >= 5:
+                continue
+            url = f"{_ARCHIVE}/content/cm/REG_IND{_ddmmyy(check)}.csv"
+            r = self._session._s.get(url, timeout=15)
+            if r.status_code == 404 or (len(r.content) > 10 and b"DOCTYPE" in r.content[:200]):
+                continue
+            r.raise_for_status()
+            reader = _csv.DictReader(_io.StringIO(r.text))
+            return [row for row in reader]
+        raise FileNotFoundError("No surveillance indicator file found in the last 5 trading days")
 
     def daily_volatility(self, dt: date | None = None) -> list[dict]:
         """

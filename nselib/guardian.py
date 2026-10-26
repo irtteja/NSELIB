@@ -253,8 +253,44 @@ class Guardian:
         try:
             return _action(url)
         except NSEFileUnavailableError:
+            # 404 on a historical date (>7 days ago) = holiday / non-trading day.
+            # Don't call Brain to "fix" the URL pattern — those 404s are expected.
+            if self._url_date_is_historical(url):
+                raise
             new_url = self._heal_archive_url(url, caller.filename, caller.function)
             return _action(new_url)
+
+    @staticmethod
+    def _url_date_is_historical(url: str) -> bool:
+        """True when the URL contains an embedded date >7 days ago."""
+        import re as _re
+        from datetime import date as _date
+        today = _date.today()
+        # Pattern 1: yyyymmdd (newer bhavcopy: BhavCopy_NSE_CM_0_0_0_20261023_...)
+        for m in _re.finditer(r'(\d{4})(\d{2})(\d{2})', url):
+            yyyy, mm, dd = int(m.group(1)), int(m.group(2)), int(m.group(3))
+            if 2000 <= yyyy <= 2099 and 1 <= mm <= 12 and 1 <= dd <= 31:
+                try:
+                    return (today - _date(yyyy, mm, dd)).days > 7
+                except ValueError:
+                    continue
+        # Pattern 2: ddmmyyyy (most archive filenames: FOSett_prce_25102026.csv)
+        for m in _re.finditer(r'(\d{2})(\d{2})(\d{4})', url):
+            dd, mm, yyyy = int(m.group(1)), int(m.group(2)), int(m.group(3))
+            if 2000 <= yyyy <= 2099 and 1 <= mm <= 12 and 1 <= dd <= 31:
+                try:
+                    return (today - _date(yyyy, mm, dd)).days > 7
+                except ValueError:
+                    continue
+        # Pattern 3: ddmmyy (2-digit year: PE_251026.csv, CMVOLT_251026.CSV)
+        for m in _re.finditer(r'(\d{2})(\d{2})(\d{2})(?!\d)', url):
+            dd, mm, yy = int(m.group(1)), int(m.group(2)), int(m.group(3))
+            if 1 <= mm <= 12 and 1 <= dd <= 31:
+                try:
+                    return (today - _date(2000 + yy, mm, dd)).days > 7
+                except ValueError:
+                    continue
+        return False
 
     def _heal_archive_url(
         self, url: str, caller_file: str, caller_name: str
