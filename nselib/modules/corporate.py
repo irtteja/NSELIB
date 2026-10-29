@@ -209,14 +209,20 @@ class CorporateMixin:
 
     def announcements(
         self,
-        symbol:   str | None = None,
-        index:    str = "equities",
+        symbol:    str | None = None,
+        index:     str = "equities",
         from_date: date | None = None,
         to_date:   date | None = None,
+        category:  str | None = None,
     ) -> list[dict]:
         """
         Exchange announcements / disclosures.
         index: 'equities' | 'sme' | 'debt' | 'mf' | 'invit'
+        category: filter by announcement type via the NSE 'subject' param, e.g.
+            'Financial Result Updates', 'Outcome of Board Meeting', 'Dividend',
+            'Acquisition', 'Updates', 'Press Release', 'Analysts/Institutional
+            Investor Meet/Con. Call Updates'. Value must match the 'desc' field
+            exactly (NSE is case-sensitive and has minor spelling variants).
 
         NSE's API ignores the from/to params for large symbols and returns the
         full history. This method filters client-side to enforce the date range.
@@ -230,16 +236,25 @@ class CorporateMixin:
         }
         if symbol:
             params["symbol"] = symbol.upper()
+        if category:
+            params["subject"] = category
         resp = self._session.get("corporate-announcements", params=params)
         rows = resp if isinstance(resp, list) else resp.get("data", resp)
 
         # NSE sometimes ignores date params — enforce the range client-side
         from_iso = from_date.isoformat()
         to_iso   = to_date.isoformat()
-        return [
+        filtered = [
             r for r in rows
             if from_iso <= r.get("sort_date", "")[:10] <= to_iso
         ]
+
+        # If category was passed, also enforce it client-side (NSE spelling variants)
+        if category:
+            cat_lower = category.lower()
+            filtered = [r for r in filtered if r.get("desc", "").lower() == cat_lower]
+
+        return filtered
 
     def board_meetings(
         self,
