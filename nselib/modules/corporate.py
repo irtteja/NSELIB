@@ -217,6 +217,9 @@ class CorporateMixin:
         """
         Exchange announcements / disclosures.
         index: 'equities' | 'sme' | 'debt' | 'mf' | 'invit'
+
+        NSE's API ignores the from/to params for large symbols and returns the
+        full history. This method filters client-side to enforce the date range.
         """
         to_date   = to_date   or date.today()
         from_date = from_date or (to_date - timedelta(days=7))
@@ -228,7 +231,15 @@ class CorporateMixin:
         if symbol:
             params["symbol"] = symbol.upper()
         resp = self._session.get("corporate-announcements", params=params)
-        return resp if isinstance(resp, list) else resp.get("data", resp)
+        rows = resp if isinstance(resp, list) else resp.get("data", resp)
+
+        # NSE sometimes ignores date params — enforce the range client-side
+        from_iso = from_date.isoformat()
+        to_iso   = to_date.isoformat()
+        return [
+            r for r in rows
+            if from_iso <= r.get("sort_date", "")[:10] <= to_iso
+        ]
 
     def board_meetings(
         self,
