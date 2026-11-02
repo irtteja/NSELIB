@@ -256,6 +256,56 @@ class CorporateMixin:
 
         return filtered
 
+    def all_announcements(
+        self,
+        from_date: date | None = None,
+        to_date:   date | None = None,
+        index:     str = "equities",
+        category:  str | None = None,
+    ) -> list[dict]:
+        """
+        Bulk download of ALL announcements for a date range — no 20-record cap.
+
+        Uses the CSV download endpoint (from_date/to_date params) that the NSE
+        website's Download (.csv) button calls. Returns parsed rows as dicts.
+
+        index: 'equities' | 'sme' | 'debt' | 'mf' | 'invit'
+        """
+        import csv, io
+        to_date   = to_date   or date.today()
+        from_date = from_date or to_date
+
+        params = {
+            "index":     index,
+            "from_date": _fmt(from_date),
+            "to_date":   _fmt(to_date),
+            "csv":       "true",
+        }
+        if category:
+            params["subject"] = category
+
+        resp = self._session._s.get(
+            "https://www.nseindia.com/api/corporate-announcements",
+            params=params,
+            timeout=30,
+        )
+        resp.raise_for_status()
+
+        # Strip UTF-8 BOM if present, then parse
+        text = resp.content.decode('utf-8-sig')
+        reader = csv.DictReader(io.StringIO(text))
+        rows = []
+        for row in reader:
+            # Strip surrounding quotes NSE adds to header names
+            clean = {k.strip('"'): v for k, v in row.items()}
+            rows.append(clean)
+
+        if category:
+            cat_lower = category.lower()
+            rows = [r for r in rows if r.get("SUBJECT", "").lower() == cat_lower]
+
+        return rows
+
     def board_meetings(
         self,
         symbol:    str | None = None,
