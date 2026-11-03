@@ -262,6 +262,7 @@ class CorporateMixin:
         to_date:   date | None = None,
         index:     str = "equities",
         category:  str | None = None,
+        comp_name: str | None = None,
     ) -> list[dict]:
         """
         Bulk download of ALL announcements for a date range — no 20-record cap.
@@ -269,7 +270,9 @@ class CorporateMixin:
         Uses the CSV download endpoint (from_date/to_date params) that the NSE
         website's Download (.csv) button calls. Returns parsed rows as dicts.
 
-        index: 'equities' | 'sme' | 'debt' | 'mf' | 'invit'
+        index:     'equities' | 'sme' | 'debt' | 'mf' | 'invit' | 'sse' |
+                   'municipalBond' | 'invitsreits' | 'dtDisclosures' | 'craDisclosures'
+        comp_name: company name filter (required by NSE when date range >= 30 days)
         """
         import csv, io
         to_date   = to_date   or date.today()
@@ -283,6 +286,8 @@ class CorporateMixin:
         }
         if category:
             params["subject"] = category
+        if comp_name:
+            params["comp_name"] = comp_name
 
         resp = self._session._s.get(
             "https://www.nseindia.com/api/corporate-announcements",
