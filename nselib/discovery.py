@@ -1,13 +1,21 @@
 """
-NSE endpoint discovery agent.
+NSE endpoint discovery — two complementary strategies:
 
-Drives a real Chromium browser through NSE pages, intercepts every API call,
-and reports endpoints not yet in endpoints.json.
+1. Browser-based (Playwright):  visit pages, intercept live network requests.
+   Finds endpoints that fire on page load. Requires local/residential IP.
+   Entry: run(update, verbose)
+
+2. Static JS analysis (cloud-safe):  fetch page HTML → find JS files →
+   read the JS → trace API URL construction in download/export handlers.
+   Finds endpoints hidden behind user interactions (button clicks, date pickers).
+   Works from any IP since it reads JS source, not live API calls.
+   Entry: scan_page_js(page_url, session) → list[dict]
 
 Usage:
-    python -m nselib.discovery               # print new endpoints
-    python -m nselib.discovery --update      # write new ones into endpoints.json
-    python -m nselib.discovery --verbose     # show all captured endpoints
+    python -m nselib.discovery               # browser-based: print new endpoints
+    python -m nselib.discovery --update      # browser-based: write to endpoints.json
+    python -m nselib.discovery --verbose     # browser-based: show all captured
+    python -m nselib.discovery --scan <url>  # static JS scan of one page
 """
 from __future__ import annotations
 
@@ -202,6 +210,121 @@ async def _discover(update: bool = False, verbose: bool = False) -> list[dict]:
     return new_endpoints
 
 
+def scan_page_js(page_url: str, session=None, verbose: bool = False) -> list[dict]:
+    """
+    Static JS analysis — cloud-safe endpoint discovery.
+
+    Fetches the page HTML, finds every JS file it loads, reads each one,
+    and searches for API URL construction patterns (window.open, fetch,
+    $.ajax, params.append, csv=true, etc.).
+
+    Returns a list of dicts:
+        {
+          "js_file":   "/dist/js/sections/corporate-filings.js",
+          "endpoint":  "corporate-announcements",
+          "params":    ["index", "from_date", "to_date", "csv"],
+          "context":   "...raw JS snippet around the match...",
+          "note":      "CSV download — use from_date/to_date not from/to",
+        }
+
+    Works from cloud (no browser, no Akamai restriction) because it reads
+    JS source files, not live API responses.
+
+    Example:
+        from nselib import NSE
+        from nselib.discovery import scan_page_js
+
+        with NSE() as nse:
+            hits = scan_page_js(
+                "https://www.nseindia.com/companies-listing/corporate-filings-announcements",
+                session=nse._session._s,
+                verbose=True,
+            )
+    """
+    import requests as _req
+
+    s = session or _req.Session()
+
+    # ── 1. Fetch page HTML ────────────────────────────────────────────────
+    r = s.get(page_url, timeout=15)
+    r.raise_for_status()
+    html = r.text
+
+    # ── 2. Find all JS file references ───────────────────────────────────
+    js_srcs = re.findall(r'src=["\']([^"\']+\.js[^"\']*)["\']', html)
+    base = "https://www.nseindia.com"
+    js_urls = [(src, base + src if src.startswith("/") else src) for src in js_srcs]
+
+    if verbose:
+        print(f"Page: {page_url}")
+        print(f"Found {len(js_urls)} JS files")
+
+    # ── 3. Patterns that indicate an API endpoint being built ─────────────
+    # Each pattern: (label, regex capturing up to 600 chars of context)
+    _API_PATTERNS = [
+        ("window.open",    re.compile(r".{0,300}window\.open\(['\"]?/api/.{0,300}", re.S)),
+        ("csv=true",       re.compile(r".{0,300}csv.{0,5}true.{0,300}",             re.S)),
+        ("from_date",      re.compile(r".{0,300}from_date.{0,300}",                 re.S)),
+        ("params.append",  re.compile(r".{0,300}params\.append.{0,500}",            re.S)),
+        ("fetch /api/",    re.compile(r".{0,200}fetch\(['\"]?/api/.{0,200}",        re.S)),
+        ("$.ajax /api/",   re.compile(r".{0,200}\$\.(?:ajax|get|post)\(['\"]?/api/.{0,200}", re.S)),
+        ("location.href",  re.compile(r".{0,200}location\.href.{0,5}/api/.{0,200}", re.S)),
+    ]
+
+    _EP_RE  = re.compile(r"/api/([a-zA-Z0-9_-]+)")
+    _PRM_RE = re.compile(r'params\.append\(["\']([^"\']+)["\']')
+
+    results: list[dict] = []
+    seen_contexts: set[str] = set()
+
+    for src, url in js_urls:
+        try:
+            jr = s.get(url, timeout=10)
+            if jr.status_code != 200:
+                continue
+            js = jr.text
+        except Exception:
+            continue
+
+        for label, pattern in _API_PATTERNS:
+            for m in pattern.finditer(js):
+                snippet = m.group(0)
+                # deduplicate near-identical snippets
+                key = snippet[:80]
+                if key in seen_contexts:
+                    continue
+                seen_contexts.add(key)
+
+                # extract endpoint name
+                ep_match = _EP_RE.search(snippet)
+                endpoint = ep_match.group(1) if ep_match else None
+
+                # extract param names
+                params = _PRM_RE.findall(snippet)
+
+                hit = {
+                    "js_file":  src,
+                    "trigger":  label,
+                    "endpoint": endpoint,
+                    "params":   params,
+                    "context":  snippet.strip()[:400],
+                }
+                results.append(hit)
+
+                if verbose:
+                    print(f"\n  [{label}] in {src}")
+                    if endpoint:
+                        print(f"    endpoint : /api/{endpoint}")
+                    if params:
+                        print(f"    params   : {params}")
+                    print(f"    snippet  : {snippet.strip()[:120]} ...")
+
+    if verbose:
+        print(f"\nTotal hits: {len(results)}")
+
+    return results
+
+
 def run(update: bool = False, verbose: bool = False) -> list[dict]:
     """Synchronous entry point."""
     return asyncio.run(_discover(update=update, verbose=verbose))
@@ -212,17 +335,23 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="NSE endpoint discovery agent")
     ap.add_argument("--update",  action="store_true", help="Write new endpoints into endpoints.json")
     ap.add_argument("--verbose", action="store_true", help="Print all captured endpoints, not just new ones")
+    ap.add_argument("--scan",    metavar="URL",        help="Static JS scan of one NSE page (cloud-safe)")
     args = ap.parse_args()
 
-    print("Starting NSE endpoint discovery …\n")
-    found = run(update=args.update, verbose=args.verbose)
-
-    if found:
-        print(f"\n{len(found)} NEW endpoint(s) found:\n")
-        for ep in found:
-            print(f"  {ep['path']}")
-            print(f"    params : {ep['params']}")
-            print(f"    status : {ep['status']}")
-            print()
+    if args.scan:
+        print(f"Static JS scan: {args.scan}\n")
+        hits = scan_page_js(args.scan, verbose=True)
+        print(f"\n{len(hits)} hit(s) found.")
     else:
-        print("\nNo new endpoints found — catalogue is up to date.")
+        print("Starting NSE endpoint discovery …\n")
+        found = run(update=args.update, verbose=args.verbose)
+
+        if found:
+            print(f"\n{len(found)} NEW endpoint(s) found:\n")
+            for ep in found:
+                print(f"  {ep['path']}")
+                print(f"    params : {ep['params']}")
+                print(f"    status : {ep['status']}")
+                print()
+        else:
+            print("\nNo new endpoints found — catalogue is up to date.")
