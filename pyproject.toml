@@ -27,3 +27,11 @@ dev = [
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["nselib*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Archive tests make real HTTP calls to nsearchives.nseindia.com.
+# Increase the default timeout so slow connections don't cause spurious failures.
+timeout = 60
+# -v gives per-test pass/fail output; -s shows any print() calls from the library
+addopts = "-v"
