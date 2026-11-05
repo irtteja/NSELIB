@@ -160,6 +160,6 @@ Format: `- [ ]` pending · `- [x]` done · `- [~]` blocked/deferred
 - [x] `vix_history(from_date, to_date)` — India VIX historical data from archive
 - [x] `fii_dii_historical(from_date, to_date)` — FII/DII historical from archive (fao_participant_vol day-by-day)
 - [ ] `circuit_breaker_history()` — stocks hitting upper/lower circuit
-- [ ] `options_oi_history(symbol, expiry)` — EOD OI per strike over time
+- [x] `options_oi_history(symbol, expiry, from_date, to_date)` — EOD OI per strike over time
 - [ ] Test suite — pytest covering all archive-based methods with known past dates
 - [ ] CI — run tests on push, alert if >10% methods break
