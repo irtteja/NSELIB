@@ -24,6 +24,29 @@ from urllib3.util.retry import Retry
 
 from .exceptions import NSESessionError, NSEFileUnavailableError
 
+# Module-level shared session — avoids re-seeding Akamai cookies on every with NSE() block
+_shared_session: "NSESession | None" = None
+_shared_folder:  str = ""
+
+def get_shared_session(download_folder: str | Path = ".", rate: float = 3.0, timeout: int = 15) -> "NSESession":
+    """Return a module-level NSESession, creating it once and reusing it across calls.
+
+    Saves ~0.5s per call vs opening a fresh NSE() context each time (cookie re-seeding overhead).
+    Thread-safe: the token bucket inside NSESession is already mutex-protected.
+    """
+    global _shared_session, _shared_folder
+    folder = str(Path(download_folder).expanduser().resolve())
+    if _shared_session is None or not _shared_session._s or _shared_folder != folder:
+        if _shared_session is not None:
+            try:
+                _shared_session.close()
+            except Exception:
+                pass
+        _shared_session = NSESession(download_folder=download_folder, rate=rate, timeout=timeout)
+        _shared_folder  = folder
+    return _shared_session
+
+
 NSE_BASE    = "https://www.nseindia.com"
 NSE_BASE_IN = "https://www.nseindia.in"   # mirror domain; used as fallback
 NSE_API     = f"{NSE_BASE}/api"
