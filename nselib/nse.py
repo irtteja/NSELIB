@@ -391,3 +391,14 @@ class NSE(
             },
             self.shareholding_patterns,
         )
+
+    # ------------------------------------------------------------------ #
+    #  Health check                                                        #
+    # ------------------------------------------------------------------ #
+
+    def health_check(self, nselib_dir: str | None = None) -> dict:
+        """Run a full health-check cycle. Returns the JSON report dict.
+        Equivalent to HealthChecker.run(nselib_dir or os.path.dirname(__file__))."""
+        from .healthcheck import HealthChecker
+        import os
+        return HealthChecker.run(nselib_dir or os.path.dirname(__file__))
