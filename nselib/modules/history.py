@@ -163,6 +163,68 @@ class HistoryMixin:
         # Fall back to daily bhavcopy files from the NSE archive (works from any IP)
         return self._equity_from_bhavcopy(symbol, series, from_date, to_date)
 
+    def vix_history(
+        self,
+        from_date: date,
+        to_date: date,
+    ) -> list[dict]:
+        """India VIX historical OHLCV from NSE archive.
+
+        Returns list of dicts with keys: date, open, high, low, close,
+        prev_close, change, pct_change.
+        Always cloud-safe (archive URL).
+
+        Args:
+            from_date: start date (inclusive)
+            to_date:   end date (inclusive)
+        """
+        url = (
+            "https://nsearchives.nseindia.com"
+            "/content/indices/histdata/VIX_history.csv"
+        )
+        resp = self._session.get_raw(url)
+        text = resp.content.decode("utf-8", errors="replace")
+
+        rows: list[dict] = []
+        reader = _csv.DictReader(_io.StringIO(text))
+        for row in reader:
+            raw_date = row.get("Date", "").strip()
+            if not raw_date:
+                continue
+
+            # Try DD-Mon-YYYY first (e.g. "01-Jan-2024"), then DD-MM-YYYY
+            parsed: date | None = None
+            for fmt in ("%d-%b-%Y", "%d-%m-%Y"):
+                try:
+                    from datetime import datetime as _dt
+                    parsed = _dt.strptime(raw_date, fmt).date()
+                    break
+                except ValueError:
+                    continue
+
+            if parsed is None or not (from_date <= parsed <= to_date):
+                continue
+
+            def _f(key: str) -> float | None:
+                v = row.get(key, "").strip()
+                try:
+                    return float(v) if v else None
+                except ValueError:
+                    return None
+
+            rows.append({
+                "date":       parsed.strftime("%Y-%m-%d"),
+                "open":       _f("Open"),
+                "high":       _f("High"),
+                "low":        _f("Low"),
+                "close":      _f("Close"),
+                "prev_close": _f("PrevClose"),
+                "change":     _f("Change"),
+                "pct_change": _f("PctChange"),
+            })
+
+        return sorted(rows, key=lambda r: r["date"])
+
     def fetch_historical_fno_data(
         self,
         symbol:       str,
