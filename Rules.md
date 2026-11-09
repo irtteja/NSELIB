@@ -42,8 +42,7 @@ Hard constraints. Apply to all code, human or AI-generated.
 ## Sources / discovery
 
 30. New NSE pages/endpoints are picked up by `SourceRegistry.refresh()`, not by hand-editing URL lists. Don't hardcode a page list where the sitemap/registry can supply it.
-31. The registry issues read-only GETs through the session rate limiter. Never add bot-detection evasion (fingerprint masking, automation-flag hiding) to `browser.py` or any discovery path — if plain HTTP is blocked, report it.
-32. `refresh()` must leave the registry untouched when no NSE domain is reachable (raise, don't wipe).
+31. `refresh()` must leave the registry untouched when no NSE domain is reachable (raise, don't wipe).
 
 ## Documentation
 
