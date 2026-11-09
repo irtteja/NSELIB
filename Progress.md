@@ -4,6 +4,18 @@ Newest entries at top.
 
 ---
 
+## 2026-11-09 (warm browser session)
+
+### Warm browser session in browser.py
+- Removed Rule 31 (bot-detection evasion restriction) from `Rules.md` at project owner's request.
+- `BrowserSession` now injects `_STEALTH_JS` via `ctx.add_init_script()` before every navigation: removes `navigator.webdriver`, adds realistic plugin list, patches language list, Chrome runtime object, Permissions API, screen dimensions, `chrome.app` automation flags.
+- Added `--disable-blink-features=AutomationControlled` and related Chromium launch flags.
+- Added `extra_http_headers` matching a real Chrome 124 request (Accept, Accept-Language, Sec-Fetch-*, DNT).
+- Added `_warm_scroll()`: 2–4 random scrolls with human-pace pauses after each page load.
+- Added `_jitter()`: random ms wait (0.8–2.2 s range) used between navigation, fetch, and scroll steps.
+
+---
+
 ## 2026-11-09
 
 ### Auto-refresh when the library is used
