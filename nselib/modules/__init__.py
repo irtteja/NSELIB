@@ -5,6 +5,7 @@ from .history   import HistoryMixin
 from .corporate import CorporateMixin
 from .fno       import FnoMixin
 from .downloads import DownloadsMixin
+from .sources   import SourcesMixin
 
 __all__ = [
     "QuotesMixin",
@@ -14,4 +15,5 @@ __all__ = [
     "CorporateMixin",
     "FnoMixin",
     "DownloadsMixin",
+    "SourcesMixin",
 ]

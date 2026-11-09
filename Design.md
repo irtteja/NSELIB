@@ -10,7 +10,8 @@ NSE (nse.py)
  ├── IndicesMixin       (modules/indices.py)
  ├── FnoMixin           (modules/fno.py)
  ├── CorporateMixin     (modules/corporate.py)
- └── DownloadsMixin     (modules/downloads.py)
+ ├── DownloadsMixin     (modules/downloads.py)
+ └── SourcesMixin       (modules/sources.py)
 ```
 
 `NSE.__init__` creates an `NSESession`, optionally a `Guardian`, and passes both to all mixins via `self._session` and `self._guardian`.
@@ -80,6 +81,32 @@ Thin wrapper around the Claude API. Called by guardian for:
 - Fuzzy-matching ambiguous schema renames
 - Generating new method code
 - Fixing failing methods
+
+## SourceRegistry (sources.py) — dynamic discovery, no Claude needed
+
+Self-maintaining map of every NSE page, API endpoint and archive file. `www.nseindia.in` is a Next.js
+site reachable from cloud IPs; the registry reads it the way a browser would:
+
+```
+sitemap.xml (+nested) ∪ homepage links ∪ navbar API   → pages (~1.8k, ~230 app routes)
+page HTML → /_next/static/chunks/*.js (content-hashed) → follow lazy chunks (BFS, cached by hash)
+JS text  → /api/..., NextApi/...?functionName=..., nsearchives content/archives/products/*.csv|zip|…
+probe    → GET each concrete source: ok | empty | template | needs-params | missing | error
+diff     → new_pages, new_sources, removed_sources, broken, recovered   (history kept, last 20)
+```
+
+- A site redeploy changes chunk hashes ⇒ only changed chunks are re-read; new endpoints appear in the diff.
+- `key` identity: APIs by path + `functionName`; dated archive files collapse to `{date}` templates
+  (probe walks today → D-5, Rule 7). `?x=${e}` becomes `{x}` so `source_fetch(key, {"x": ...})` fills it.
+- Domain failover `.in` → `.com`, active base remembered; `NSESession` does the same (`_prefer_in`).
+- `refresh(browser=True)` additionally records runtime `/api/` calls from a real browser (`browser.py`,
+  optional Playwright, no fingerprint masking) — catches dynamically-built URLs.
+- Runs unattended: `Guardian.watch()` and `HealthChecker.run()` call it; `python -m nselib.sources --watch 3600`;
+  `.github/workflows/refresh-sources.yml` re-crawls daily and commits `nselib/sources_seed.json`
+  (shipped snapshot used on first run).
+- Generic access (cloud-safe for `.in` + archives): `nse.sources_list/find()`, `source_pages()`,
+  `source_fetch(key, params, trade_date)`, `sources_refresh()`. MCP exposes them automatically.
+- Registry file: `~/.nselib/sources.json`.
 
 ## Module: fno.py
 

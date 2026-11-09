@@ -151,6 +151,20 @@ Format: `- [ ]` pending · `- [x]` done · `- [~]` blocked/deferred
 - [ ] Expose `nse.health_check()` convenience wrapper on NSE class
 - [ ] Add `HealthChecker` to `nselib/__init__.py` exports
 
+## Dynamic source discovery (sources.py)
+
+- [x] `SourceRegistry.refresh()` — sitemap + nav + JS-chunk crawl → pages / API / archive sources, live probes, diff report
+- [x] Domain failover `.in` ↔ `.com`, remembered (`NSESession._prefer_in`, registry `active_base`)
+- [x] `SourcesMixin`: `sources_refresh/list/find`, `source_pages`, `source_fetch` (auto-exposed over MCP)
+- [x] `Guardian.refresh_sources()` wired into `watch()`; `HealthChecker.run()` step 0
+- [x] Offline test-suite with a mutable fake site (`tests/test_sources.py`, 10 tests)
+- [x] Shipped seed `nselib/sources_seed.json` + daily GitHub Action `refresh-sources.yml` (first scheduled run unverified)
+- [x] `browser.py` — optional Playwright layer (cookie harvest, in-page fetch, runtime API observation); `NSESession(browser_fallback=True)`
+- [x] Auto-refresh on use: `NSE()` / `NSE.shared()` start a background `refresh_if_stale()` (>24h old, 10-min attempt lock, `NSELIB_AUTO_REFRESH=0` to disable)
+- [x] Run `browser.py` end-to-end — verified 2026-11-09 (cookies, in-page fetch, runtime API observation; plain Chromium, no masking)
+- [ ] Typed methods for high-value discovered sources (e.g. `getMarketTurnover`, `getAdvanceDecline`) — registry already serves them generically
+- [ ] Verify `refresh-sources.yml` can reach NSE from GitHub runners
+
 ## Rules / documentation
 
 - [x] Rule 26–28: No API key needed in Claude sessions — documented in Rules.md
