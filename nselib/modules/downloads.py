@@ -183,8 +183,9 @@ class DownloadsMixin:
         z = _zf.ZipFile(_io.BytesIO(r.content))
 
         def _read(name_prefix):
+            pfx = name_prefix.lower()
             for info in z.infolist():
-                if info.filename.startswith(name_prefix):
+                if info.filename.lower().startswith(pfx):
                     with z.open(info.filename) as f:
                         return f.read().decode("latin-1", errors="replace")
             return ""
@@ -194,7 +195,7 @@ class DownloadsMixin:
             if not text:
                 return []
             reader = _csv.DictReader(_io.StringIO(text))
-            return [{k.strip(): v.strip() for k, v in row.items()} for row in reader]
+            return [{k.strip(): (v.strip() if v is not None else "") for k, v in row.items()} for row in reader]
 
         # --- announcements (an*.txt) ---
         def _parse_announcements(text):
