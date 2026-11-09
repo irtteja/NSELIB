@@ -170,3 +170,18 @@ def test_registry_persists_across_instances(env, tmp_path):
     _base_site(site); reg.refresh()
     again = SourceRegistry(path=tmp_path / "sources.json")
     assert again.pages() == reg.pages() and len(again.sources()) == len(reg.sources())
+
+
+def test_refresh_if_stale_only_when_old_and_throttled(env, monkeypatch):
+    from datetime import datetime, timedelta, timezone
+    site, reg = env
+    _base_site(site)
+    monkeypatch.setenv("NSELIB_AUTO_REFRESH", "1")
+    assert reg.refresh_if_stale(background=False) is True          # never crawled -> stale
+    assert reg.data["updated"]
+    assert reg.refresh_if_stale(background=False) is False         # fresh now
+    reg.data["updated"] = (datetime.now(timezone.utc) - timedelta(days=2)).isoformat()
+    assert reg.refresh_if_stale(background=False) is False         # stale but lock <10 min old
+    monkeypatch.setenv("NSELIB_AUTO_REFRESH", "0")
+    reg._path.with_suffix(".lock").unlink()
+    assert reg.refresh_if_stale(background=False) is False         # opted out

@@ -98,6 +98,15 @@ class NSE(
             # Redirect all session.get() calls through the Guardian
             self._session.get = self._guardian.guarded_get
 
+        self._auto_refresh_sources()
+
+    def _auto_refresh_sources(self) -> None:
+        """Keep the NSE page/endpoint registry fresh: background re-crawl if >24h old."""
+        try:
+            self.sources.refresh_if_stale()
+        except Exception:
+            pass
+
     # ------------------------------------------------------------------ #
     #  Shared singleton — avoids cookie re-seeding on every context open  #
     # ------------------------------------------------------------------ #
@@ -131,6 +140,7 @@ class NSE(
             inst._brain    = None
             inst._guardian = None
             cls._shared    = inst
+            inst._auto_refresh_sources()
         return cls._shared
 
     # ------------------------------------------------------------------ #

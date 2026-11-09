@@ -6,6 +6,12 @@ Newest entries at top.
 
 ## 2026-11-09
 
+### Auto-refresh when the library is used
+- `SourceRegistry.refresh_if_stale()` + `NSE._auto_refresh_sources()` (called from `NSE()` and `NSE.shared()`): if the registry is >24h old, a daemon thread re-crawls; `NSE()` itself returns instantly. A lock file allows one attempt per 10 min across processes; `NSELIB_AUTO_REFRESH=0` disables.
+- Verified live with an empty `~/.nselib`: `NSE()` returned in 0.0 s, registry populated ~168 s later (1775 pages, 109 sources; slower than the 35 s manual run because the session rate limiter applies). Short-lived scripts that exit first kill the daemon thread; the next start retries.
+- GitHub Action cannot be dispatched: workflow exists only on `for-smollm`, not default branch `main` (404). Not merged — no PR was requested.
+- Test added (11 offline tests pass).
+
 ### Dynamic NSE source discovery (SourceRegistry)
 - **Network:** session egress allowlist was empty; added `www.nseindia.com`, `www.nseindia.in`, `nsearchives.nseindia.com` to the environment. From this cloud IP: `.in` homepage/API/sitemap 200, `.com` homepage 403 (API 200), archives 200.
 - **Finding:** `nseindia.in` is a Next.js (Turbopack) site with a 300 KB `sitemap.xml` (1.6k URLs, ~60 app routes + CMS pages) and content-hashed JS chunks that contain every API call. APIs are all `NextApi/...?functionName=...` form.

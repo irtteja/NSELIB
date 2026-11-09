@@ -530,6 +530,45 @@ class SourceRegistry:
         self.save()
         return report
 
+    def refresh_if_stale(self, max_age: float = 86400, background: bool = True) -> bool:
+        """Re-crawl only if the registry is older than `max_age` seconds. Returns True if a crawl was started.
+
+        Runs in a daemon thread by default so callers never wait. A lock file throttles
+        attempts to one per 10 minutes across processes, so a failing/blocked crawl
+        isn't retried on every start. Disable with NSELIB_AUTO_REFRESH=0.
+        """
+        import os
+        if os.environ.get("NSELIB_AUTO_REFRESH", "1") == "0":
+            return False
+        upd = self.data.get("updated")
+        if upd:
+            try:
+                age = (datetime.now(timezone.utc) - datetime.fromisoformat(upd)).total_seconds()
+                if age < max_age:
+                    return False
+            except ValueError:
+                pass
+        lock = self._path.with_suffix(".lock")
+        try:
+            if lock.exists() and time.time() - lock.stat().st_mtime < 600:
+                return False
+            lock.parent.mkdir(parents=True, exist_ok=True)
+            lock.touch()
+        except OSError:
+            return False
+
+        def _run():
+            try:
+                self.refresh()
+            except Exception:
+                pass          # blocked/offline — try again after the lock expires
+
+        if background:
+            threading.Thread(target=_run, daemon=True, name="nselib-sources-refresh").start()
+        else:
+            _run()
+        return True
+
     def _can_judge_removal(self, key: str, found: dict) -> bool:
         """Only call a source removed if the chunks that used to reference it were re-read."""
         for name, c in self.data["chunks"].items():
