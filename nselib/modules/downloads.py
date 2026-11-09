@@ -762,37 +762,56 @@ class DownloadsMixin:
     def corporate_bonds_traded(self, dt: date | None = None) -> list[dict]:
         """Corporate bonds traded on NSE for the given date.
 
+        Extracted from the PR bhavcopy ZIP (corpbond*.csv inside it).
+
         Returns: [{symbol, security, series, prev_close, open, high, low, close,
                    traded_value, traded_qty, trades, hi_52wk, lo_52wk}]
         """
-        base = dt or (date.today() - timedelta(days=1))
-        r, _ = _find_recent_file(
-            self._session,
-            lambda d: f"{_ARCHIVE}/archives/equities/corpbond/corpbond{_ddmmyyyy(d)}.csv",
-            base,
-        )
-        out = []
-        for row in _csv.DictReader(_io.StringIO(r.text)):
-            sym = (row.get("SYMBOL") or "").strip()
-            if not sym:
+        import zipfile as _zf
+        base = _prev_trading_day(dt or (date.today() - timedelta(days=1)))
+
+        for offset in range(5):
+            check = base - timedelta(days=offset)
+            if check.weekday() >= 5:
                 continue
-            def _f(k, _row=row): return float((_row.get(k) or "0").strip().replace(",", "") or 0)
-            out.append({
-                "symbol":       sym,
-                "security":     (row.get("SECURITY") or "").strip(),
-                "series":       (row.get("SERIES") or "").strip(),
-                "prev_close":   _f("PREV_CL_PR"),
-                "open":         _f("OPEN_PRICE"),
-                "high":         _f("HIGH_PRICE"),
-                "low":          _f("LOW_PRICE"),
-                "close":        _f("CLOSE_PRICE"),
-                "traded_value": _f("NET_TRDVAL"),
-                "traded_qty":   int(_f("NET_TRDQTY")),
-                "trades":       int(_f("TRADES")),
-                "hi_52wk":      _f("HI_52_WK"),
-                "lo_52wk":      _f("LO_52_WK"),
-            })
-        return out
+            url = f"{_ARCHIVE}/archives/equities/bhavcopy/pr/PR{_ddmmyy(check)}.zip"
+            try:
+                r = self._session._s.get(url, timeout=20)
+                if r.status_code != 200 or b"DOCTYPE" in r.content[:50]:
+                    continue
+                z = _zf.ZipFile(_io.BytesIO(r.content))
+                csv_name = next(
+                    (n for n in z.namelist() if n.lower().startswith("corpbond")), None
+                )
+                if not csv_name:
+                    continue
+                text = z.open(csv_name).read().decode("latin-1", errors="replace")
+                out = []
+                for row in _csv.DictReader(_io.StringIO(text)):
+                    sym = (row.get("SYMBOL") or "").strip()
+                    if not sym:
+                        continue
+                    def _f(k, _row=row):
+                        return float((_row.get(k) or "0").strip().replace(",", "") or 0)
+                    out.append({
+                        "symbol":       sym,
+                        "security":     (row.get("SECURITY") or "").strip(),
+                        "series":       (row.get("SERIES") or "").strip(),
+                        "prev_close":   _f("PREV_CL_PR"),
+                        "open":         _f("OPEN_PRICE"),
+                        "high":         _f("HIGH_PRICE"),
+                        "low":          _f("LOW_PRICE"),
+                        "close":        _f("CLOSE_PRICE"),
+                        "traded_value": _f("NET_TRDVAL"),
+                        "traded_qty":   int(_f("NET_TRDQTY")),
+                        "trades":       int(_f("TRADES")),
+                        "hi_52wk":      _f("HI_52_WK"),
+                        "lo_52wk":      _f("LO_52_WK"),
+                    })
+                return out
+            except Exception:
+                continue
+        raise FileNotFoundError(f"PR bhavcopy ZIP not found within 5 trading days of {base}")
 
     def market_activity_report(self, dt: date | None = None) -> dict:
         """Market Activity Report — daily market summary statistics.
