@@ -127,7 +127,7 @@ class BrowserSession:
             raise NSEDataError("Browser mode needs playwright: pip install playwright") from e
         self._pw = sync_playwright().start()
         kw: dict[str, Any] = dict(
-            headless=True,
+            headless=False,
             args=[
                 "--no-sandbox",
                 "--disable-blink-features=AutomationControlled",
