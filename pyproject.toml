@@ -28,6 +28,9 @@ dev = [
 where = ["."]
 include = ["nselib*"]
 
+[tool.setuptools.package-data]
+nselib = ["*.json"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 # Archive tests make real HTTP calls to nsearchives.nseindia.com.

@@ -185,6 +185,17 @@ class HealthChecker:
         print("[HealthChecker] Starting full health cycle…")
         ts = datetime.now().isoformat()
 
+        # Step 0 — refresh the live map of NSE pages / APIs / archive files
+        print("[HealthChecker] Step 0/4 — refreshing NSE source registry…")
+        g = getattr(self._nse, "_guardian", None)
+        if g is not None:
+            sources_report = g.refresh_sources()
+        else:
+            try:
+                sources_report = self._nse.sources_refresh()
+            except Exception as exc:
+                sources_report = {"error": str(exc)}
+
         # Step 1 — test every method
         print("[HealthChecker] Step 1/4 — testing all registered methods…")
         method_results = self._test_all()
@@ -213,6 +224,7 @@ class HealthChecker:
                 "verified_pass":   discovery_results.get("verified_pass", 0),
                 "verified_removed":discovery_results.get("verified_removed", 0),
             },
+            "sources":   sources_report,
             "methods":   method_results,
             "heals":     heal_results,
             "discovery": discovery_results,

@@ -1,0 +1,36 @@
+name: refresh-sources
+
+# Keeps nselib's map of NSE pages / APIs / archive files current with no human
+# involved: re-crawls the live site daily and commits nselib/sources_seed.json
+# when NSE added, removed or broke anything.  Also runnable by hand.
+on:
+  schedule:
+    - cron: "17 3 * * *"        # 08:47 IST, before the Indian market opens
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e . pytest
+      - name: Offline tests
+        run: python -m pytest tests/test_sources.py -q
+      - name: Re-crawl NSE
+        run: python -m nselib.sources --path "$RUNNER_TEMP/sources.json" --export-seed
+      - name: Commit changes
+        run: |
+          if git diff --quiet -- nselib/sources_seed.json; then
+            echo "NSE unchanged"; exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add nselib/sources_seed.json
+          git commit -m "chore: refresh NSE source registry seed"
+          git push

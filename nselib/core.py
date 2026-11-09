@@ -206,6 +206,7 @@ class NSESession:
         rate:        float = 3.0,
         timeout:     int   = 15,
         max_retries: int   = 5,
+        browser_fallback: bool = False,
     ):
         self.download_folder = Path(download_folder)
         self.download_folder.mkdir(parents=True, exist_ok=True)
@@ -215,6 +216,8 @@ class NSESession:
         self._cookie_file = self.download_folder / self._COOKIE_FILE
         self._cookie_ts:    float = 0.0
         self._cookie_ts_in: float = 0.0   # tracks nseindia.in session freshness
+        self._prefer_in = False           # set once .in answers where .com is blocked
+        self._browser_fallback = browser_fallback   # last resort: fetch via real browser
 
         # requests.Session with automatic retry on transient errors
         self._s = requests.Session()
@@ -318,6 +321,12 @@ class NSESession:
           3. If still 403 (cloud/IP block), try www.nseindia.in/api/<path>
           4. If .in also fails or returns empty, raise the original error
         """
+        if self._prefer_in:
+            data = self._get_in(path, params)
+            if data:
+                return data
+            self._prefer_in = False   # .in stopped answering — go back to .com
+
         self._bucket.consume()
         self._ensure_session()
 
@@ -331,23 +340,16 @@ class NSESession:
             self._bucket.consume()
             resp = self._s.get(url, params=params, timeout=self._timeout)
 
-        # If .com is still blocked, try nseindia.in as fallback
+        # If .com is still blocked, try nseindia.in as fallback (and remember it worked)
         if resp.status_code == 403:
-            self._ensure_session_in()
-            url_in = f"{NSE_API_IN}/{path.lstrip('/')}"
-            try:
-                self._bucket.consume()
-                resp_in = self._s.get(
-                    url_in, params=params, timeout=self._timeout,
-                    headers=_HEADERS_IN,
-                )
-                if resp_in.status_code == 200:
-                    data = resp_in.json()
-                    if data:  # non-empty — .in has the data
-                        return data
-            except Exception:
-                pass
-            # .in didn't help — raise the original 403
+            data = self._get_in(path, params)
+            if data:
+                self._prefer_in = True
+                return data
+            data = self._get_browser(path, params)
+            if data:
+                return data
+            # nothing helped — raise the original 403
             resp.raise_for_status()
 
         if resp.status_code == 404:
@@ -355,6 +357,37 @@ class NSESession:
 
         resp.raise_for_status()
         return resp.json()
+
+    def _get_in(self, path: str, params: dict | None) -> Any:
+        """Try nseindia.in; returns parsed non-empty JSON or None."""
+        self._ensure_session_in()
+        try:
+            self._bucket.consume()
+            r = self._s.get(f"{NSE_API_IN}/{path.lstrip('/')}", params=params,
+                            timeout=self._timeout, headers=_HEADERS_IN)
+            if r.status_code == 200:
+                return r.json() or None
+        except Exception:
+            pass
+        return None
+
+    def _get_browser(self, path: str, params: dict | None) -> Any:
+        """Last resort (opt-in): fetch from inside a real browser page. Returns JSON or None."""
+        if not self._browser_fallback:
+            return None
+        try:
+            from urllib.parse import urlencode
+            from .browser import BrowserSession
+            q = f"?{urlencode(params)}" if params else ""
+            for base in (NSE_BASE_IN, NSE_BASE):
+                with BrowserSession(base) as b:
+                    try:
+                        return b.fetch_json(f"/api/{path.lstrip('/')}{q}") or None
+                    except Exception:
+                        continue
+        except Exception:
+            pass
+        return None
 
     def get_raw(self, url: str, stream: bool = False) -> requests.Response:
         """

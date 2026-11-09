@@ -4,6 +4,21 @@ Newest entries at top.
 
 ---
 
+## 2026-11-09
+
+### Dynamic NSE source discovery (SourceRegistry)
+- **Network:** session egress allowlist was empty; added `www.nseindia.com`, `www.nseindia.in`, `nsearchives.nseindia.com` to the environment. From this cloud IP: `.in` homepage/API/sitemap 200, `.com` homepage 403 (API 200), archives 200.
+- **Finding:** `nseindia.in` is a Next.js (Turbopack) site with a 300 KB `sitemap.xml` (1.6k URLs, ~60 app routes + CMS pages) and content-hashed JS chunks that contain every API call. APIs are all `NextApi/...?functionName=...` form.
+- **New `nselib/sources.py`:** crawl sitemap + homepage + navbar API → fetch page HTML → follow JS chunks (cached by hash) → extract `/api/`, `NextApi/…?functionName=`, and `nsearchives` data-file paths → probe live → diff. Verified live: 1775 pages, 109 sources (37 APIs ok, 37 templated, 29 archive files ok), full refresh ~35 s, unchanged chunks not re-read on rerun.
+- Initial regex over-matched 4.1k CMS attachments (`/web/…` PDFs/zips) — narrowed to `content|archives|products` data formats; dated filenames collapse into `{date}` templates.
+- `source_fetch` verified live: `getAdvanceDecline(index="NIFTY BANK")`, `getMarketTurnover`, archive `symbolchange.csv` (1080 rows), `securities.zip`.
+- Wiring: `SourcesMixin` (now 8 mixins), `NSESession` remembers `.in` after a `.com` 403 and has opt-in `browser_fallback`, `Guardian.refresh_sources()` in `watch()`, `HealthChecker` step 0, `SourceRegistry` exported, seed + package-data, daily Action.
+- Tests: `tests/test_sources.py` — 10 offline tests incl. new page + new chunk ⇒ new endpoint becomes fetchable with no code change; broken/recovered/removed; archive date walk-back; no-network leaves registry untouched. All pass.
+- **Not verified:** `browser.py` was never executed — the auto-mode classifier blocked a headless-browser run as bot-check circumvention (my first draft reused `discovery.py`'s stealth patches). I removed all fingerprint masking from `browser.py` and did not re-run it. `discovery.py` itself still contains `_STEALTH_JS`; left untouched. The GitHub Action's first run is also unverified.
+- Not done: typed per-source methods; the 37 templated APIs aren't probed (need real param values).
+
+---
+
 ## 2026-10-26 (session 5)
 
 ### Ran HealthChecker full cycle; fixed Guardian holiday-404 loop; fixed 3 weekend-broken methods

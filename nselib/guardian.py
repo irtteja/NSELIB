@@ -1159,14 +1159,38 @@ Reply with ONLY a JSON object:
 
         return results
 
+    def refresh_sources(self) -> dict | None:
+        """Re-crawl NSE pages/APIs/archive files (SourceRegistry); log anything new, removed or broken.
+
+        New sources are immediately reachable through `nse.source_fetch()` — no code generation needed.
+        """
+        try:
+            from .sources import SourceRegistry
+            rep = SourceRegistry(self._session).refresh()
+        except Exception as exc:
+            self._log("sources_refresh_failed", error=str(exc))
+            print(f"[Guardian] source refresh failed: {exc}")
+            return None
+        if rep["new_pages"] or rep["new_sources"] or rep["removed_sources"] or rep["broken"] or rep["recovered"]:
+            self._log("sources_changed", **{k: rep[k] for k in
+                      ("new_pages", "removed_pages", "new_sources", "removed_sources", "broken", "recovered")})
+            print(f"[Guardian] NSE changed: {len(rep['new_pages'])} new pages, "
+                  f"{len(rep['new_sources'])} new sources {rep['new_sources'][:5]}, "
+                  f"{len(rep['broken'])} broken, {len(rep['removed_sources'])} removed")
+        return rep
+
     def watch(self, interval: int = 3600, nselib_dir: str | Path | None = None) -> None:
         """
         Run discover() + discover_archive() in a background thread every
         `interval` seconds. New endpoints are printed; call apply() to write them.
         """
         def _loop():
+            first = True
             while True:
-                time.sleep(interval)
+                if not first:
+                    time.sleep(interval)
+                first = False
+                self.refresh_sources()
                 found  = self.discover()
                 found += self.discover_archive(nselib_dir=nselib_dir)
                 if found:

@@ -21,6 +21,7 @@ from .modules import (
     CorporateMixin,
     FnoMixin,
     DownloadsMixin,
+    SourcesMixin,
 )
 
 
@@ -32,6 +33,7 @@ class NSE(
     CorporateMixin,
     FnoMixin,
     DownloadsMixin,
+    SourcesMixin,
 ):
     """
     NSE data library with optional Claude-powered intelligence.

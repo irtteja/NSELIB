@@ -7,6 +7,7 @@ from .brain      import Brain
 from .guardian   import Guardian
 from .core       import NSESession
 from .healthcheck import HealthChecker
+from .sources    import SourceRegistry
 from .exceptions import (
     NSESessionError,
     NSEFileUnavailableError,
@@ -22,6 +23,7 @@ __all__ = [
     "Brain",
     "NSESession",
     "HealthChecker",
+    "SourceRegistry",
     "NSESessionError",
     "NSEFileUnavailableError",
     "NSEDataError",
