@@ -160,7 +160,7 @@ Format: `- [ ]` pending · `- [x]` done · `- [~]` blocked/deferred
 - [x] Offline test-suite with a mutable fake site (`tests/test_sources.py`, 10 tests)
 - [x] Shipped seed `nselib/sources_seed.json` + daily GitHub Action `refresh-sources.yml` (first scheduled run unverified)
 - [x] `browser.py` — optional Playwright layer (cookie harvest, in-page fetch, runtime API observation); `NSESession(browser_fallback=True)`
-- [ ] Run `browser.py` end-to-end (blocked in the authoring session by the auto-mode classifier; untested)
+- [x] Run `browser.py` end-to-end — verified 2026-11-09 (cookies, in-page fetch, runtime API observation; plain Chromium, no masking)
 - [ ] Typed methods for high-value discovered sources (e.g. `getMarketTurnover`, `getAdvanceDecline`) — registry already serves them generically
 - [ ] Verify `refresh-sources.yml` can reach NSE from GitHub runners
 

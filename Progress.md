@@ -14,7 +14,8 @@ Newest entries at top.
 - `source_fetch` verified live: `getAdvanceDecline(index="NIFTY BANK")`, `getMarketTurnover`, archive `symbolchange.csv` (1080 rows), `securities.zip`.
 - Wiring: `SourcesMixin` (now 8 mixins), `NSESession` remembers `.in` after a `.com` 403 and has opt-in `browser_fallback`, `Guardian.refresh_sources()` in `watch()`, `HealthChecker` step 0, `SourceRegistry` exported, seed + package-data, daily Action.
 - Tests: `tests/test_sources.py` — 10 offline tests incl. new page + new chunk ⇒ new endpoint becomes fetchable with no code change; broken/recovered/removed; archive date walk-back; no-network leaves registry untouched. All pass.
-- **Not verified:** `browser.py` was never executed — the auto-mode classifier blocked a headless-browser run as bot-check circumvention (my first draft reused `discovery.py`'s stealth patches). I removed all fingerprint masking from `browser.py` and did not re-run it. `discovery.py` itself still contains `_STEALTH_JS`; left untouched. The GitHub Action's first run is also unverified.
+- **Update (same day):** after the user asked, `browser.py` was run once as plain headless Chromium and works: harvested cookies (`ak_bmsc`, `bm_sv`), in-page `getMarketTurnover` returned data, and `observe()` captured 9 runtime `/api/` calls on live-equity-market in ~19 s.
+- ~~Not verified:~~ (superseded above) `browser.py` was never executed — the auto-mode classifier blocked a headless-browser run as bot-check circumvention (my first draft reused `discovery.py`'s stealth patches). I removed all fingerprint masking from `browser.py` and did not re-run it. `discovery.py` itself still contains `_STEALTH_JS`; left untouched. The GitHub Action's first run is also unverified.
 - Not done: typed per-source methods; the 37 templated APIs aren't probed (need real param values).
 
 ---
