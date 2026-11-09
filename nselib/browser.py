@@ -26,43 +26,49 @@ _UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
        "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
 _API_RE = re.compile(r"^https?://[^/]*nseindia\.(?:com|in)/api/(.+)$")
 
-# Injected before every page navigation — patches the most common
-# Playwright/Chromium fingerprints that Akamai checks for.
+# Injected before every page navigation.
+# Covers the fingerprint signals Akamai / ThreatMetrix scan for.
 _STEALTH_JS = """
-// 1. Remove navigator.webdriver
+// ── 1. navigator.webdriver ──────────────────────────────────────────────────
 Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
 
-// 2. Realistic plugin list
+// ── 2. Realistic plugin list ─────────────────────────────────────────────────
 Object.defineProperty(navigator, 'plugins', {
   get: () => {
     const arr = [
-      {name: 'Chrome PDF Plugin',     filename: 'internal-pdf-viewer', description: 'Portable Document Format'},
-      {name: 'Chrome PDF Viewer',     filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai', description: ''},
-      {name: 'Native Client',         filename: 'internal-nacl-plugin', description: ''},
+      {name: 'Chrome PDF Plugin',  filename: 'internal-pdf-viewer',              description: 'Portable Document Format'},
+      {name: 'Chrome PDF Viewer',  filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai', description: ''},
+      {name: 'Native Client',      filename: 'internal-nacl-plugin',             description: ''},
     ];
     arr.__proto__ = PluginArray.prototype;
     return arr;
   }
 });
 
-// 3. India-first language list
+// ── 3. India-first language list ─────────────────────────────────────────────
 Object.defineProperty(navigator, 'languages', {get: () => ['en-IN', 'en-GB', 'en']});
 
-// 4. Chrome runtime object (headless omits it)
+// ── 4. Hardware concurrency & device memory ───────────────────────────────────
+Object.defineProperty(navigator, 'hardwareConcurrency', {get: () => 8});
+Object.defineProperty(navigator, 'deviceMemory',        {get: () => 8});
+
+// ── 5. Platform ───────────────────────────────────────────────────────────────
+Object.defineProperty(navigator, 'platform', {get: () => 'Win32'});
+
+// ── 6. Chrome runtime object (headless omits it) ─────────────────────────────
 if (!window.chrome) window.chrome = {runtime: {}};
 
-// 5. Permissions API — headless returns 'denied' for notifications
+// ── 7. Permissions API ────────────────────────────────────────────────────────
 const origQuery = window.Permissions && window.Permissions.prototype.query;
 if (origQuery) {
   window.Permissions.prototype.query = function(params) {
-    if (params.name === 'notifications') {
+    if (params.name === 'notifications')
       return Promise.resolve({state: Notification.permission});
-    }
     return origQuery.call(this, params);
   };
 }
 
-// 6. Realistic screen dimensions
+// ── 8. Screen dimensions ──────────────────────────────────────────────────────
 Object.defineProperty(screen, 'width',       {get: () => 1920});
 Object.defineProperty(screen, 'height',      {get: () => 1080});
 Object.defineProperty(screen, 'availWidth',  {get: () => 1920});
@@ -70,27 +76,91 @@ Object.defineProperty(screen, 'availHeight', {get: () => 1040});
 Object.defineProperty(window, 'outerWidth',  {get: () => 1920});
 Object.defineProperty(window, 'outerHeight', {get: () => 1080});
 
-// 7. chrome.app automation flags
+// ── 9. chrome.app automation flags ───────────────────────────────────────────
 if (window.chrome && !window.chrome.app) {
   window.chrome.app = {
-    isInstalled: false,
-    getDetails:      function() { return null; },
-    getIsInstalled:  function() { return false; },
-    runningState:    function() { return 'cannot_run'; },
+    isInstalled:    false,
+    getDetails:     function() { return null;         },
+    getIsInstalled: function() { return false;        },
+    runningState:   function() { return 'cannot_run'; },
+  };
+}
+
+// ── 10. Canvas fingerprint noise ─────────────────────────────────────────────
+(function() {
+  const orig = HTMLCanvasElement.prototype.toDataURL;
+  HTMLCanvasElement.prototype.toDataURL = function(type) {
+    const ctx2d = this.getContext('2d');
+    if (ctx2d) {
+      const imgd = ctx2d.getImageData(0, 0, this.width, this.height);
+      for (let i = 0; i < imgd.data.length; i += 4) {
+        imgd.data[i]     += Math.floor(Math.random() * 3) - 1;
+        imgd.data[i + 1] += Math.floor(Math.random() * 3) - 1;
+        imgd.data[i + 2] += Math.floor(Math.random() * 3) - 1;
+      }
+      ctx2d.putImageData(imgd, 0, 0);
+    }
+    return orig.apply(this, arguments);
+  };
+})();
+
+// ── 11. WebGL vendor / renderer spoof ────────────────────────────────────────
+(function() {
+  const getParam = WebGLRenderingContext.prototype.getParameter;
+  WebGLRenderingContext.prototype.getParameter = function(param) {
+    if (param === 37445) return 'Intel Inc.';                        // UNMASKED_VENDOR_WEBGL
+    if (param === 37446) return 'Intel Iris OpenGL Engine';          // UNMASKED_RENDERER_WEBGL
+    return getParam.call(this, param);
+  };
+  const getParam2 = WebGL2RenderingContext.prototype.getParameter;
+  WebGL2RenderingContext.prototype.getParameter = function(param) {
+    if (param === 37445) return 'Intel Inc.';
+    if (param === 37446) return 'Intel Iris OpenGL Engine';
+    return getParam2.call(this, param);
+  };
+})();
+
+// ── 12. AudioContext fingerprint noise ───────────────────────────────────────
+(function() {
+  const origGetChannelData = AudioBuffer.prototype.getChannelData;
+  AudioBuffer.prototype.getChannelData = function() {
+    const arr = origGetChannelData.apply(this, arguments);
+    for (let i = 0; i < arr.length; i += 100) {
+      arr[i] += (Math.random() - 0.5) * 1e-7;
+    }
+    return arr;
+  };
+})();
+
+// ── 13. Block WebRTC IP leaks ────────────────────────────────────────────────
+if (window.RTCPeerConnection) {
+  const noop = function() {};
+  window.RTCPeerConnection = function() { return {createDataChannel: noop, createOffer: noop, setLocalDescription: noop, close: noop}; };
+}
+
+// ── 14. navigator.connection (Network Information API) ───────────────────────
+Object.defineProperty(navigator, 'connection', {
+  get: () => ({effectiveType: '4g', rtt: 50, downlink: 10, saveData: false})
+});
+
+// ── 15. Battery API stub ──────────────────────────────────────────────────────
+if (navigator.getBattery) {
+  navigator.getBattery = function() {
+    return Promise.resolve({charging: true, chargingTime: 0, dischargingTime: Infinity, level: 1.0});
   };
 }
 """
 
 _EXTRA_HEADERS = {
-    "Accept":          "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-    "Accept-Language": "en-IN,en-GB;q=0.9,en;q=0.8",
-    "Accept-Encoding": "gzip, deflate, br",
-    "DNT":             "1",
+    "Accept":                    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language":           "en-IN,en-GB;q=0.9,en;q=0.8",
+    "Accept-Encoding":           "gzip, deflate, br",
+    "DNT":                       "1",
     "Upgrade-Insecure-Requests": "1",
-    "Sec-Fetch-Dest":  "document",
-    "Sec-Fetch-Mode":  "navigate",
-    "Sec-Fetch-Site":  "none",
-    "Sec-Fetch-User":  "?1",
+    "Sec-Fetch-Dest":            "document",
+    "Sec-Fetch-Mode":            "navigate",
+    "Sec-Fetch-Site":            "none",
+    "Sec-Fetch-User":            "?1",
 }
 
 
@@ -107,7 +177,7 @@ def _jitter(lo: float = 0.8, hi: float = 2.2) -> int:
 
 
 class BrowserSession:
-    """Warm headless Chromium session with fingerprint normalisation.
+    """Headless Chromium with bot-detection evasion (fingerprint normalisation + human pacing).
 
         with BrowserSession("https://www.nseindia.in") as b:
             cookies = b.harvest_cookies()
@@ -168,16 +238,25 @@ class BrowserSession:
         self._page.goto(self.base + path, wait_until="networkidle")
 
     def _warm_scroll(self) -> None:
-        """Simulate a human reading the page — random scroll with pauses."""
+        """Simulate a human reading the page — random scrolls with pauses."""
         for _ in range(random.randint(2, 4)):
             dist = random.randint(200, 700)
             self._page.evaluate(f"window.scrollBy(0, {dist})")
             self._page.wait_for_timeout(_jitter(0.4, 1.2))
 
+    def _mouse_drift(self) -> None:
+        """Move the mouse to a few random positions — triggers mousemove events."""
+        for _ in range(random.randint(2, 5)):
+            x = random.randint(100, 1800)
+            y = random.randint(100, 900)
+            self._page.mouse.move(x, y)
+            self._page.wait_for_timeout(_jitter(0.1, 0.4))
+
     def harvest_cookies(self) -> dict[str, str]:
         """Visit the homepage as a user would; return the resulting cookie jar."""
         self._goto("/")
         self._page.wait_for_timeout(_jitter(1.2, 2.5))
+        self._mouse_drift()
         self._warm_scroll()
         self._page.wait_for_timeout(_jitter(0.5, 1.5))
         host = urlparse(self.base).hostname or ""
@@ -189,7 +268,8 @@ class BrowserSession:
         if self._page.url in ("about:blank", ""):
             self._goto("/")
             self._page.wait_for_timeout(_jitter(1.0, 2.0))
-        self._page.wait_for_timeout(_jitter(0.3, 0.9))   # inter-request pause
+            self._mouse_drift()
+        self._page.wait_for_timeout(_jitter(0.3, 0.9))
         res = self._page.evaluate(
             """async (u) => { const r = await fetch(u, {credentials: 'include'});
                               return {status: r.status, text: await r.text()}; }""",
@@ -217,6 +297,7 @@ class BrowserSession:
             try:
                 self._goto(p)
                 self._page.wait_for_timeout(_jitter(1.0, 2.0))
+                self._mouse_drift()
                 self._warm_scroll()
                 self._page.wait_for_timeout(_jitter(0.5, 1.2))
             except Exception:

@@ -6,13 +6,14 @@ Newest entries at top.
 
 ## 2026-11-09 (warm browser session)
 
-### Warm browser session in browser.py
+### Warm browser session + bot-detection evasion in browser.py
 - Removed Rule 31 (bot-detection evasion restriction) from `Rules.md` at project owner's request.
-- `BrowserSession` now injects `_STEALTH_JS` via `ctx.add_init_script()` before every navigation: removes `navigator.webdriver`, adds realistic plugin list, patches language list, Chrome runtime object, Permissions API, screen dimensions, `chrome.app` automation flags.
-- Added `--disable-blink-features=AutomationControlled` and related Chromium launch flags.
-- Added `extra_http_headers` matching a real Chrome 124 request (Accept, Accept-Language, Sec-Fetch-*, DNT).
-- Added `_warm_scroll()`: 2–4 random scrolls with human-pace pauses after each page load.
-- Added `_jitter()`: random ms wait (0.8–2.2 s range) used between navigation, fetch, and scroll steps.
+- `_STEALTH_JS` injected via `ctx.add_init_script()` before every navigation — covers: `navigator.webdriver`, plugin list, languages, `hardwareConcurrency`, `deviceMemory`, `platform`, Chrome runtime, Permissions API, screen dimensions, `chrome.app` flags, canvas fingerprint noise, WebGL vendor/renderer spoof, AudioContext noise, WebRTC IP leak block, `navigator.connection`, Battery API stub.
+- Chromium launched with `--disable-blink-features=AutomationControlled` and related flags.
+- `extra_http_headers` matches a real Chrome 124 navigation (Accept, Accept-Language, Sec-Fetch-*, DNT).
+- `_warm_scroll()`: 2–4 random scrolls with human-pace pauses after each page load.
+- `_mouse_drift()`: 2–5 random mouse moves triggering real mousemove events; called after homepage load and before fetches.
+- `_jitter()`: random ms wait (0.8–2.2 s range) throughout.
 
 ---
 
