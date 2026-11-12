@@ -1529,7 +1529,8 @@
 "archive:/content/press/prs_ra_archives.xls": {
 "kind": "archive",
 "pages": [
-"/invest/investors-regulatory-actions"
+"/invest/investors-regulatory-actions",
+"/regulations/exchange-market-surveillance-regulatory-actions"
 ],
 "target": "/content/press/prs_ra_archives.xls"
 },
@@ -1543,7 +1544,9 @@
 "archive:/content/press/prs_ra_sebi.xls": {
 "kind": "archive",
 "pages": [
-"/invest/investors-regulatory-actions"
+"/invest/investors-regulatory-actions",
+"/regulations/exchange-market-surveillance-regulatory-actions",
+"/regulations/member-sebi-debarred-entities"
 ],
 "target": "/content/press/prs_ra_sebi.xls"
 },
