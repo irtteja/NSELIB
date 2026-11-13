@@ -1,8 +1,5 @@
 {
 "pages": {
-"/": {
-"origin": "home"
-},
 "/all-reports": {
 "origin": "sitemap"
 },
@@ -12,242 +9,11 @@
 "/all-reports-derivatives": {
 "origin": "sitemap"
 },
-"/all-reports-egr": {
-"origin": "home"
-},
 "/all-reports/historical-equities-fii-fpi-dii-trading-activity": {
 "origin": "sitemap"
 },
-"/careers-at-nse": {
-"origin": "home"
-},
-"/companies-listing/circular-for-listed-companies-equity-market": {
-"origin": "home"
-},
-"/companies-listing/compliance-information-compliance-calendar-main-board": {
-"origin": "home"
-},
-"/companies-listing/corporate-filings-actions": {
-"origin": "home"
-},
-"/companies-listing/corporate-filings-announcements": {
-"origin": "home"
-},
-"/companies-listing/corporate-filings-annual-reports": {
-"origin": "home"
-},
-"/companies-listing/corporate-filings-application": {
-"origin": "home"
-},
-"/companies-listing/corporate-filings-board-meetings": {
-"origin": "home"
-},
-"/companies-listing/corporate-filings-directory": {
-"origin": "home"
-},
-"/companies-listing/corporate-filings-financial-results": {
-"origin": "home"
-},
-"/companies-listing/corporate-filings-offer-documents": {
-"origin": "home"
-},
-"/companies-listing/corporate-filings-postal-ballot": {
-"origin": "home"
-},
-"/companies-listing/corporate-filings-scheme-document": {
-"origin": "home"
-},
-"/companies-listing/corporate-filings-shareholding-pattern": {
-"origin": "home"
-},
-"/companies-listing/corporate-filings-shareholding-pattern-sdd": {
-"origin": "home"
-},
-"/companies-listing/corporate-filings-unitholding-pattern": {
-"origin": "home"
-},
-"/companies-listing/corporate-filings-voting-results": {
-"origin": "home"
-},
-"/companies-listing/corporate-integrated-filing": {
-"origin": "home"
-},
-"/companies-listing/public-issue-advertisements": {
-"origin": "home"
-},
-"/companies-listing/raising-capital-debt-private-placement": {
-"origin": "home"
-},
-"/companies-listing/raising-capital-further-issues-main-sme-checklist": {
-"origin": "home"
-},
-"/companies-listing/raising-capital-mutual-funds-etfs-process": {
-"origin": "home"
-},
-"/companies-listing/raising-capital-onboarding-process": {
-"origin": "home"
-},
-"/companies-listing/raising-capital-public-issues-eligibility-equity-debt": {
-"origin": "home"
-},
-"/companies-listing/raising-capital-public-issues-listing-on-emerge": {
-"origin": "home"
-},
-"/companies-listing/sebi-regulations": {
-"origin": "home"
-},
-"/companies-listing/xbrl-information": {
-"origin": "home"
-},
-"/complaints/about-arbitration": {
-"origin": "home"
-},
-"/complaints/about-defaulter-section": {
-"origin": "home"
-},
-"/complaints/arbitration-awards": {
-"origin": "home"
-},
-"/complaints/arbitration-hearing": {
-"origin": "home"
-},
-"/complaints/arbitration-panel": {
-"origin": "home"
-},
-"/complaints/complaint-at-exchange": {
-"origin": "home"
-},
-"/complaints/complaints-public-notice": {
-"origin": "home"
-},
-"/complaints/defaulter-expelled-members": {
-"origin": "home"
-},
-"/complaints/defaulters-committee": {
-"origin": "home"
-},
-"/complaints/details-to-be-provided-for-lodging-claims": {
-"origin": "home"
-},
-"/complaints/file-a-complaint-online": {
-"origin": "home"
-},
-"/complaints/investor-protection-fund-trust": {
-"origin": "home"
-},
-"/complaints/online-dispute-resolution": {
-"origin": "home"
-},
-"/complaints/process-of-making-a-complaint": {
-"origin": "home"
-},
-"/complaints/submit-tipoff": {
-"origin": "home"
-},
-"/contact/contact-us": {
-"origin": "home"
-},
-"/event-gallery": {
-"origin": "home"
-},
-"/feedback/new": {
-"origin": "home"
-},
-"/historical-data/egr": {
-"origin": "home"
-},
-"/historical-spot-price": {
-"origin": "home"
-},
-"/index-tracker/NIFTY%2050": {
-"origin": "home"
-},
-"/index-tracker/null": {
-"origin": "home"
-},
-"/invest/be-a-smart-investor": {
-"origin": "home"
-},
-"/invest/company-listing-directory-resources-for-investors": {
-"origin": "home"
-},
-"/invest/complaint-arbitration-status": {
-"origin": "home"
-},
-"/invest/exit-option-for-share-holders": {
-"origin": "home"
-},
-"/invest/find-a-stock-broker": {
-"origin": "home"
-},
-"/invest/first-time-investor-getting-started": {
-"origin": "home"
-},
-"/invest/first-time-investor-stamp-duty-charges-taxes": {
-"origin": "home"
-},
-"/invest/foreign_portfolio_investors": {
-"origin": "home"
-},
-"/invest/investor-charter": {
-"origin": "home"
-},
-"/invest/investors-awareness-programs": {
-"origin": "home"
-},
-"/invest/investors-regulatory-actions": {
-"origin": "home"
-},
-"/investor-relations/announcements": {
-"origin": "home"
-},
-"/learn/academic-calendar": {
-"origin": "home"
-},
-"/learn/certification-modules/getting-started": {
-"origin": "home"
-},
-"/learn/class-room-courses": {
-"origin": "home"
-},
-"/learn/courses-for-post-graduates": {
-"origin": "home"
-},
-"/learn/courses-for-under-graduates": {
-"origin": "home"
-},
-"/learn/courses-for-working-professionals": {
-"origin": "home"
-},
-"/learn/interactive-courses": {
-"origin": "home"
-},
-"/learn/ncfm-prepare-for-a-test": {
-"origin": "home"
-},
-"/learn/nse-international-certificate-program": {
-"origin": "home"
-},
-"/learn/overview-about-nse-academy": {
-"origin": "home"
-},
-"/learn/partner-programs": {
-"origin": "home"
-},
-"/learn/process-to-register-ncfm-nse-certification-in-financial-markets": {
-"origin": "home"
-},
-"/learn/recorded-courses": {
-"origin": "home"
-},
-"/learn/self-study-ncfm-modules-all": {
-"origin": "home"
-},
 "/market-data/52-week-high-equity-market": {
 "origin": "sitemap"
-},
-"/market-data/52-week-high-equity-market ": {
-"origin": "home"
 },
 "/market-data/52-week-low-equity-market": {
 "origin": "sitemap"
@@ -294,9 +60,6 @@
 "/market-data/block-deal-watch": {
 "origin": "sitemap"
 },
-"/market-data/block-deals": {
-"origin": "home"
-},
 "/market-data/bond-market-futures": {
 "origin": "sitemap"
 },
@@ -305,9 +68,6 @@
 },
 "/market-data/both-band-hitters": {
 "origin": "sitemap"
-},
-"/market-data/closing-auction-session": {
-"origin": "home"
 },
 "/market-data/commodity-derivatives": {
 "origin": "sitemap"
@@ -330,12 +90,6 @@
 "/market-data/debt-market-tri-party-repo": {
 "origin": "sitemap"
 },
-"/market-data/decline": {
-"origin": "home"
-},
-"/market-data/egr": {
-"origin": "home"
-},
 "/market-data/equity-derivatives-watch": {
 "origin": "sitemap"
 },
@@ -357,26 +111,17 @@
 "/market-data/liquidity-enhancement-scheme": {
 "origin": "sitemap"
 },
-"/market-data/liquidity-window-facility": {
-"origin": "home"
-},
 "/market-data/live-equity-market": {
 "origin": "sitemap"
 },
 "/market-data/live-market-indices": {
 "origin": "sitemap"
 },
-"/market-data/live-market-indices/heatmap": {
-"origin": "home"
-},
 "/market-data/live-t0-market": {
 "origin": "sitemap"
 },
 "/market-data/lower-band-hitters": {
 "origin": "sitemap"
-},
-"/market-data/market-timings": {
-"origin": "home"
 },
 "/market-data/most-active-contracts": {
 "origin": "sitemap"
@@ -401,9 +146,6 @@
 },
 "/market-data/pre-open-market-cm-and-emerge-market": {
 "origin": "sitemap"
-},
-"/market-data/pre-open-market-egr": {
-"origin": "home"
 },
 "/market-data/price-bands-surveillance-actions": {
 "origin": "sitemap"
@@ -432,50 +174,11 @@
 "/market-data/top-gainers-losers": {
 "origin": "sitemap"
 },
-"/market-data/unchanged": {
-"origin": "home"
-},
 "/market-data/upper-band-hitters": {
 "origin": "sitemap"
 },
 "/market-data/volume-gainers-spurts": {
 "origin": "sitemap"
-},
-"/national-stock-exchange/about-nse-company": {
-"origin": "home"
-},
-"/national-stock-exchange/awards-recognition": {
-"origin": "home"
-},
-"/national-stock-exchange/nse-volume-business-growth": {
-"origin": "home"
-},
-"/national-stock-exchange/our-group": {
-"origin": "home"
-},
-"/nse-academy/nse-academy-overview": {
-"origin": "home"
-},
-"/nse-copyright": {
-"origin": "home"
-},
-"/nse-data-and-analytics": {
-"origin": "home"
-},
-"/nse-foundation/about-us": {
-"origin": "home"
-},
-"/nse-indices": {
-"origin": "home"
-},
-"/nse-international-exchange/about": {
-"origin": "home"
-},
-"/nse-investments": {
-"origin": "home"
-},
-"/nseint_clearing/nse-international-clearing-overview": {
-"origin": "home"
 },
 "/option-chain": {
 "origin": "sitemap"
@@ -483,95 +186,8 @@
 "/position-limit": {
 "origin": "sitemap"
 },
-"/primary-market/ebp-placement-reporting": {
-"origin": "home"
-},
-"/products-services/about-commodity-derivatives": {
-"origin": "home"
-},
-"/products-services/about-currency-derivatives": {
-"origin": "home"
-},
-"/products-services/about-equity-derivatives": {
-"origin": "home"
-},
-"/products-services/about-equity-market": {
-"origin": "home"
-},
-"/products-services/about-indices": {
-"origin": "home"
-},
-"/products-services/about-initial-public-offerings": {
-"origin": "home"
-},
-"/products-services/about-interest-rate-derivatives": {
-"origin": "home"
-},
-"/products-services/emerge-platform-about-sme": {
-"origin": "home"
-},
 "/products-services/equity-derivatives-risk-management-sec-ban": {
 "origin": "sitemap"
-},
-"/products-services/fixed-income-debt-overview": {
-"origin": "home"
-},
-"/products-services/mf-about-mfss": {
-"origin": "home"
-},
-"/registered-client-accounts": {
-"origin": "home"
-},
-"/regulations/clarification-verification-to-market-rumour": {
-"origin": "home"
-},
-"/regulations/exchange-defaulting-clients": {
-"origin": "home"
-},
-"/regulations/exchange-disclosures-nsccl-iosco-core-sgf-default-waterfall": {
-"origin": "home"
-},
-"/regulations/exchange-market-regulations-rules-byelaws-nseil": {
-"origin": "home"
-},
-"/regulations/exchange-market-surveillance-actions": {
-"origin": "home"
-},
-"/regulations/exchange-market-surveillance-regulatory-actions": {
-"origin": "home"
-},
-"/regulations/listing-compliance": {
-"origin": "home"
-},
-"/regulations/listing-compliance/non-compliant-companies-list": {
-"origin": "home"
-},
-"/regulations/member-circulars-for-members": {
-"origin": "home"
-},
-"/regulations/member-sebi-debarred-entities": {
-"origin": "home"
-},
-"/regulations/public-notice": {
-"origin": "home"
-},
-"/regulations/queries-raised-to-listed-companies": {
-"origin": "home"
-},
-"/regulations/unsolicited-messages-report": {
-"origin": "home"
-},
-"/report-detail/eq_security": {
-"origin": "home"
-},
-"/report-detail/fo_eq_security": {
-"origin": "home"
-},
-"/reports-indices-historical-index-data": {
-"origin": "home"
-},
-"/reports-indices-historical-vix": {
-"origin": "home"
 },
 "/reports/asm": {
 "origin": "sitemap"
@@ -584,237 +200,48 @@
 },
 "/reports/rumour-verification": {
 "origin": "sitemap"
-},
-"/research/events-conferences": {
-"origin": "home"
-},
-"/research/events-lecture-series": {
-"origin": "home"
-},
-"/research/events-seminars-panel-dicussions": {
-"origin": "home"
-},
-"/research/events-upcoming-programs": {
-"origin": "home"
-},
-"/research/past-initiatives": {
-"origin": "home"
-},
-"/research/publications-reports-corporate-governance-reports": {
-"origin": "home"
-},
-"/research/publications-reports-nse-market-insights": {
-"origin": "home"
-},
-"/research/publications-reports-nse-market-pulse": {
-"origin": "home"
-},
-"/research/research-initiatives": {
-"origin": "home"
-},
-"/research/working-papers": {
-"origin": "home"
-},
-"/resources/exchange-communication-circulars": {
-"origin": "home"
-},
-"/resources/exchange-communication-holidays": {
-"origin": "home"
-},
-"/resources/exchange-communication-media-center": {
-"origin": "home"
-},
-"/resources/exchange-communication-media-queries": {
-"origin": "home"
-},
-"/resources/exchange-communication-press-releases": {
-"origin": "home"
-},
-"/resources/faqs": {
-"origin": "home"
-},
-"/resources/forms-formats-members": {
-"origin": "home"
-},
-"/resources/historical-reports-capital-market-daily-monthly-archives": {
-"origin": "home"
-},
-"/resources/historical-reports-capital-market-daily-monthly-archives-debt-market": {
-"origin": "home"
-},
-"/resources/historical-reports-capital-market-daily-monthly-archives-derivative-market": {
-"origin": "home"
-},
-"/sse": {
-"origin": "home"
-},
-"/structure-key-personnel/corporate-structure": {
-"origin": "home"
-},
-"/submit-tipoff": {
-"origin": "home"
-},
-"/trade/admission-process-documents-to-become-a-member": {
-"origin": "home"
-},
-"/trade/deposits-networth-requirements-for-membership": {
-"origin": "home"
-},
-"/trade/members-change-in-name": {
-"origin": "home"
-},
-"/trade/members-compliance": {
-"origin": "home"
-},
-"/trade/membership-formats": {
-"origin": "home"
-},
-"/trade/membership-suspension-expulsion": {
-"origin": "home"
-},
-"/trade/membership-types": {
-"origin": "home"
-},
-"/trade/membership-using-enit": {
-"origin": "home"
-},
-"/trade/platform-services-connectivity": {
-"origin": "home"
-},
-"/trade/platform-services-neat-trading-system": {
-"origin": "home"
-},
-"/trade/platform-services-non-neat-front-end": {
-"origin": "home"
-},
-"/trade/platform-services-test-and-simulated-market-facility": {
-"origin": "home"
 }
 },
 "sources": {
-"api:NextApi/apiClient#getActiveContracts": {
-"kind": "api",
-"pages": [
-"/"
-],
-"target": "NextApi/apiClient?functionName=getActiveContracts"
-},
-"api:NextApi/apiClient#getCorporateInfo": {
-"kind": "api",
-"pages": [
-"/"
-],
-"target": "NextApi/apiClient?functionName=getCorporateInfo&&type=null&&noOfRecords={noOfRecords}&&flag={flag}"
-},
-"api:NextApi/apiClient#getCurrencySnapshot": {
-"kind": "api",
-"pages": [
-"/"
-],
-"target": "NextApi/apiClient?functionName=getCurrencySnapshot&&type=W&&flag={flag}"
-},
 "api:NextApi/apiClient#getGiftNifty": {
 "kind": "api",
 "pages": [
-"/",
-"/historical-data/egr",
-"/index-tracker/NIFTY%2050",
-"/index-tracker/null"
+"/market-data/block-deal-watch",
+"/market-data/exchange-traded-funds-etf",
+"/market-data/live-equity-market",
+"/market-data/live-t0-market"
 ],
 "target": "NextApi/apiClient?functionName=getGiftNifty"
-},
-"api:NextApi/apiClient#getGraphChart": {
-"kind": "api",
-"pages": [
-"/"
-],
-"target": "NextApi/apiClient?functionName=getGraphChart&&type=${e?e.toUpperCase():"
 },
 "api:NextApi/apiClient#getIndexData": {
 "kind": "api",
 "pages": [
-"/",
-"/historical-data/egr",
-"/index-tracker/NIFTY%2050",
-"/index-tracker/null"
+"/market-data/block-deal-watch",
+"/market-data/exchange-traded-funds-etf",
+"/market-data/live-equity-market",
+"/market-data/live-t0-market"
 ],
 "target": "NextApi/apiClient?functionName=getIndexData&&type=All"
-},
-"api:NextApi/apiClient#getIpoTracker": {
-"kind": "api",
-"pages": [
-"/"
-],
-"target": "NextApi/apiClient?functionName=getIpoTracker"
 },
 "api:NextApi/apiClient#getListingData": {
 "kind": "api",
 "pages": [
-"/",
-"/historical-data/egr",
-"/index-tracker/NIFTY%2050",
-"/index-tracker/null"
+"/market-data/block-deal-watch",
+"/market-data/exchange-traded-funds-etf",
+"/market-data/live-equity-market",
+"/market-data/live-t0-market"
 ],
 "target": "NextApi/apiClient?functionName=getListingData"
-},
-"api:NextApi/apiClient#getMarketSnapshot": {
-"kind": "api",
-"pages": [
-"/"
-],
-"target": "NextApi/apiClient?functionName=getMarketSnapshot&&type={type}"
-},
-"api:NextApi/apiClient#getMarketStatistics": {
-"kind": "api",
-"pages": [
-"/"
-],
-"target": "NextApi/apiClient?functionName=getMarketStatistics"
-},
-"api:NextApi/apiClient#getMarketTurnover": {
-"kind": "api",
-"pages": [
-"/"
-],
-"target": "NextApi/apiClient?functionName=getMarketTurnover"
 },
 "api:NextApi/apiClient#getMarketTurnoverSummary": {
 "kind": "api",
 "pages": [
-"/",
-"/historical-data/egr",
-"/index-tracker/NIFTY%2050",
-"/index-tracker/null"
+"/market-data/block-deal-watch",
+"/market-data/exchange-traded-funds-etf",
+"/market-data/live-equity-market",
+"/market-data/live-t0-market"
 ],
 "target": "NextApi/apiClient?functionName=getMarketTurnoverSummary"
-},
-"api:NextApi/apiClient#getMarqueData": {
-"kind": "api",
-"pages": [
-"/"
-],
-"target": "NextApi/apiClient?functionName=getMarqueData"
-},
-"api:NextApi/apiClient#getReferenceRates": {
-"kind": "api",
-"pages": [
-"/"
-],
-"target": "NextApi/apiClient?functionName=getReferenceRates&&type=null&&flag={flag}"
-},
-"api:NextApi/apiClient/casApi#getAllFnoIndexData": {
-"kind": "api",
-"pages": [
-"/market-data/closing-auction-session"
-],
-"target": "NextApi/apiClient/casApi?functionName=getAllFnoIndexData"
-},
-"api:NextApi/apiClient/casApi#getCASData": {
-"kind": "api",
-"pages": [
-"/market-data/closing-auction-session"
-],
-"target": "NextApi/apiClient/casApi?functionName=getCASData"
 },
 "api:NextApi/apiClient/cmPreOpenApi#getPreOpenCategory": {
 "kind": "api",
@@ -851,276 +278,15 @@
 ],
 "target": "NextApi/apiClient/cmPreOpenApi?functionName=getPreOpenGraphFNO&indentifier={indentifier}"
 },
-"api:NextApi/apiClient/commonApi#getLatencyNanoSec": {
-"kind": "api",
-"pages": [
-"/"
-],
-"target": "NextApi/apiClient/commonApi?functionName=getLatencyNanoSec"
-},
-"api:NextApi/apiClient/egrApi#getEGRBlockDealData": {
-"kind": "api",
-"pages": [
-"/market-data/block-deals"
-],
-"target": "NextApi/apiClient/egrApi?functionName=getEGRBlockDealData"
-},
-"api:NextApi/apiClient/egrApi#getEGRNMData": {
-"kind": "api",
-"pages": [
-"/market-data/egr"
-],
-"target": "NextApi/apiClient/egrApi?functionName=getEGRNMData&symbol={symbol}"
-},
-"api:NextApi/apiClient/egrApi#getEGRNMData${i?": {
-"kind": "api",
-"pages": [
-"/market-data/egr"
-],
-"target": "NextApi/apiClient/egrApi?functionName=getEGRNMData${i?"
-},
-"api:NextApi/apiClient/egrApi#getEGRPreOpenData": {
-"kind": "api",
-"pages": [
-"/market-data/pre-open-market-egr"
-],
-"target": "NextApi/apiClient/egrApi?functionName=getEGRPreOpenData"
-},
-"api:NextApi/apiClient/egrApi#getEGRSymbolData": {
-"kind": "api",
-"pages": [
-"/market-data/egr",
-"/market-data/pre-open-market-egr"
-],
-"target": "NextApi/apiClient/egrApi?functionName=getEGRSymbolData"
-},
-"api:NextApi/apiClient/egrApi#getEgrHistoricalData": {
-"kind": "api",
-"pages": [
-"/historical-data/egr"
-],
-"target": "NextApi/apiClient/egrApi?functionName=getEgrHistoricalData&fromDate={fromDate}&toDate={toDate}${_?"
-},
-"api:NextApi/apiClient/egrApi#getEgrNormalMktGraphData": {
-"kind": "api",
-"pages": [
-"/market-data/egr"
-],
-"target": "NextApi/apiClient/egrApi?functionName=getEgrNormalMktGraphData&symbol={symbol}&type=W&token=1"
-},
-"api:NextApi/apiClient/egrApi#getEgrPreOpenGraphData": {
-"kind": "api",
-"pages": [
-"/market-data/pre-open-market-egr"
-],
-"target": "NextApi/apiClient/egrApi?functionName=getEgrPreOpenGraphData&symbol={symbol}&type=W&token=1"
-},
-"api:NextApi/apiClient/egrApi#getHistoricalEGRSymbolData": {
-"kind": "api",
-"pages": [
-"/historical-data/egr"
-],
-"target": "NextApi/apiClient/egrApi?functionName=getHistoricalEGRSymbolData"
-},
-"api:NextApi/apiClient/historicalGraph#getGraphChart": {
-"kind": "api",
-"pages": [
-"/"
-],
-"target": "NextApi/apiClient/historicalGraph?functionName=getGraphChart&&type=${e?e.toUpperCase():"
-},
-"api:NextApi/apiClient/historicalGraph#getIndexChart": {
-"kind": "api",
-"pages": [
-"/index-tracker/NIFTY%2050",
-"/index-tracker/null"
-],
-"target": "NextApi/apiClient/historicalGraph?functionName=getIndexChart&&index={index}&flag={flag}"
-},
-"api:NextApi/apiClient/homeApi#getCMSAdvertisementBannerTop": {
-"kind": "api",
-"pages": [
-"/"
-],
-"target": "NextApi/apiClient/homeApi?functionName=getCMSAdvertisementBannerTop"
-},
 "api:NextApi/apiClient/homeApi#getCMSHeaderListingTop": {
 "kind": "api",
 "pages": [
-"/",
-"/historical-data/egr",
-"/index-tracker/NIFTY%2050",
-"/index-tracker/null"
+"/market-data/block-deal-watch",
+"/market-data/exchange-traded-funds-etf",
+"/market-data/live-equity-market",
+"/market-data/live-t0-market"
 ],
 "target": "NextApi/apiClient/homeApi?functionName=getCMSHeaderListingTop"
-},
-"api:NextApi/apiClient/homeApi#getCMSPopUpBanner": {
-"kind": "api",
-"pages": [
-"/"
-],
-"target": "NextApi/apiClient/homeApi?functionName=getCMSPopUpBanner"
-},
-"api:NextApi/apiClient/homeApi#getIndicesData": {
-"kind": "api",
-"pages": [
-"/"
-],
-"target": "NextApi/apiClient/homeApi?functionName=getIndicesData"
-},
-"api:NextApi/apiClient/indexTrackerApi#getAdvanceDecline": {
-"kind": "api",
-"pages": [
-"/index-tracker/NIFTY%2050",
-"/index-tracker/null"
-],
-"target": "NextApi/apiClient/indexTrackerApi?functionName=getAdvanceDecline&&index={index}"
-},
-"api:NextApi/apiClient/indexTrackerApi#getAllIndices": {
-"kind": "api",
-"pages": [
-"/index-tracker/NIFTY%2050",
-"/index-tracker/null"
-],
-"target": "NextApi/apiClient/indexTrackerApi?functionName=getAllIndices"
-},
-"api:NextApi/apiClient/indexTrackerApi#getAllIndicesSymbols": {
-"kind": "api",
-"pages": [
-"/index-tracker/NIFTY%2050",
-"/index-tracker/null"
-],
-"target": "NextApi/apiClient/indexTrackerApi?functionName=getAllIndicesSymbols&&index={index}"
-},
-"api:NextApi/apiClient/indexTrackerApi#getAnnouncementsIndices": {
-"kind": "api",
-"pages": [
-"/index-tracker/NIFTY%2050",
-"/index-tracker/null"
-],
-"target": "NextApi/apiClient/indexTrackerApi?functionName=getAnnouncementsIndices&flag=CAN&&index={index}"
-},
-"api:NextApi/apiClient/indexTrackerApi#getBoardMeeting": {
-"kind": "api",
-"pages": [
-"/index-tracker/NIFTY%2050",
-"/index-tracker/null"
-],
-"target": "NextApi/apiClient/indexTrackerApi?functionName=getBoardMeeting&&flag=BM&&index={index}"
-},
-"api:NextApi/apiClient/indexTrackerApi#getCasBtnStatus": {
-"kind": "api",
-"pages": [
-"/",
-"/index-tracker/NIFTY%2050",
-"/index-tracker/null"
-],
-"target": "NextApi/apiClient/indexTrackerApi?functionName=getCasBtnStatus"
-},
-"api:NextApi/apiClient/indexTrackerApi#getConstituents": {
-"kind": "api",
-"pages": [
-"/index-tracker/NIFTY%2050",
-"/index-tracker/null"
-],
-"target": "NextApi/apiClient/indexTrackerApi?functionName=getConstituents&&index={index}&&noofrecords=0"
-},
-"api:NextApi/apiClient/indexTrackerApi#getContributionData": {
-"kind": "api",
-"pages": [
-"/index-tracker/NIFTY%2050",
-"/index-tracker/null"
-],
-"target": "NextApi/apiClient/indexTrackerApi?functionName=getContributionData&&index={index}&&flag=0"
-},
-"api:NextApi/apiClient/indexTrackerApi#getCorporateAction": {
-"kind": "api",
-"pages": [
-"/index-tracker/NIFTY%2050",
-"/index-tracker/null"
-],
-"target": "NextApi/apiClient/indexTrackerApi?functionName=getCorporateAction&&flag=CAC&&index={index}"
-},
-"api:NextApi/apiClient/indexTrackerApi#getFinancialResultGraph": {
-"kind": "api",
-"pages": [
-"/index-tracker/NIFTY%2050",
-"/index-tracker/null"
-],
-"target": "NextApi/apiClient/indexTrackerApi?functionName=getFinancialResultGraph&&symbol={symbol}"
-},
-"api:NextApi/apiClient/indexTrackerApi#getHeatMapGraphChart": {
-"kind": "api",
-"pages": [
-"/index-tracker/NIFTY%2050",
-"/index-tracker/null"
-],
-"target": "NextApi/apiClient/indexTrackerApi?functionName=getHeatMapGraphChart&&identifier={identifier}"
-},
-"api:NextApi/apiClient/indexTrackerApi#getIndexChart": {
-"kind": "api",
-"pages": [
-"/",
-"/index-tracker/NIFTY%2050",
-"/index-tracker/null"
-],
-"target": "NextApi/apiClient/indexTrackerApi?functionName=getIndexChart&&index=${e?e.toUpperCase():"
-},
-"api:NextApi/apiClient/indexTrackerApi#getIndexData": {
-"kind": "api",
-"pages": [
-"/index-tracker/NIFTY%2050",
-"/index-tracker/null"
-],
-"target": "NextApi/apiClient/indexTrackerApi?functionName=getIndexData&&index={index}"
-},
-"api:NextApi/apiClient/indexTrackerApi#getIndexFacts": {
-"kind": "api",
-"pages": [
-"/index-tracker/NIFTY%2050",
-"/index-tracker/null"
-],
-"target": "NextApi/apiClient/indexTrackerApi?functionName=getIndexFacts&&index={index}"
-},
-"api:NextApi/apiClient/indexTrackerApi#getIndicesHeatMap": {
-"kind": "api",
-"pages": [
-"/index-tracker/NIFTY%2050",
-"/index-tracker/null"
-],
-"target": "NextApi/apiClient/indexTrackerApi?functionName=getIndicesHeatMap&&index={index}"
-},
-"api:NextApi/apiClient/indexTrackerApi#getIndicesReturn": {
-"kind": "api",
-"pages": [
-"/index-tracker/NIFTY%2050",
-"/index-tracker/null"
-],
-"target": "NextApi/apiClient/indexTrackerApi?functionName=getIndicesReturn&&index={index}"
-},
-"api:NextApi/apiClient/indexTrackerApi#getMostActiveContracts": {
-"kind": "api",
-"pages": [
-"/index-tracker/NIFTY%2050",
-"/index-tracker/null"
-],
-"target": "NextApi/apiClient/indexTrackerApi?functionName=getMostActiveContracts&&index={index}"
-},
-"api:NextApi/apiClient/indexTrackerApi#getShareHoldingData": {
-"kind": "api",
-"pages": [
-"/index-tracker/NIFTY%2050",
-"/index-tracker/null"
-],
-"target": "NextApi/apiClient/indexTrackerApi?functionName=getShareHoldingData&&symbol={symbol}"
-},
-"api:NextApi/apiClient/indexTrackerApi#getTopFiveStock": {
-"kind": "api",
-"pages": [
-"/index-tracker/NIFTY%2050",
-"/index-tracker/null"
-],
-"target": "NextApi/apiClient/indexTrackerApi?functionName=getTopFiveStock&&flag={flag}&&index={index}"
 },
 "api:NextApi/apiClient/marketWatchApi#getBlockDealsData": {
 "kind": "api",
@@ -1242,71 +408,43 @@
 ],
 "target": "NextApi/apiClient/marketWatchApi?functionName=getT0Data"
 },
-"api:NextApi/apiStatic#getLeftNavData": {
-"kind": "api",
-"pages": [
-"/research/publications-reports-nse-market-pulse"
-],
-"target": "NextApi/apiStatic?functionName=getLeftNavData&url=/static/research/publications-reports-nse-market-pulse"
-},
-"api:NextApi/apiStatic#getMarketPulseInsightData": {
-"kind": "api",
-"pages": [
-"/research/publications-reports-nse-market-pulse"
-],
-"target": "NextApi/apiStatic?functionName=getMarketPulseInsightData&type=marketpulse"
-},
 "api:NextApi/apiStatic#getNavbarData": {
 "kind": "api",
 "pages": [
-"/",
-"/historical-data/egr",
-"/index-tracker/NIFTY%2050",
-"/index-tracker/null"
+"/market-data/block-deal-watch",
+"/market-data/exchange-traded-funds-etf",
+"/market-data/live-equity-market",
+"/market-data/live-t0-market"
 ],
 "target": "NextApi/apiStatic?functionName=getNavbarData&refkey=mainNavigation"
 },
 "api:NextApi/apiStatic#getNotesData": {
 "kind": "api",
 "pages": [
-"/",
-"/historical-data/egr",
-"/index-tracker/NIFTY%2050",
-"/index-tracker/null"
+"/market-data/block-deal-watch",
+"/market-data/exchange-traded-funds-etf",
+"/market-data/live-equity-market",
+"/market-data/live-t0-market"
 ],
 "target": "NextApi/apiStatic?functionName=getNotesData&url=/market-data/pre-open-market-cm-and-emerge-market"
-},
-"api:NextApi/cmsHandler#getAdvertisementBannerBottom": {
-"kind": "api",
-"pages": [
-"/"
-],
-"target": "NextApi/cmsHandler?functionName=getAdvertisementBannerBottom"
-},
-"api:NextApi/cmsHandler#getHomePageMarqueeCMS": {
-"kind": "api",
-"pages": [
-"/"
-],
-"target": "NextApi/cmsHandler?functionName=getHomePageMarqueeCMS"
 },
 "api:NextApi/cmsHandler#getNotificationList": {
 "kind": "api",
 "pages": [
-"/",
-"/historical-data/egr",
-"/index-tracker/NIFTY%2050",
-"/index-tracker/null"
+"/market-data/block-deal-watch",
+"/market-data/exchange-traded-funds-etf",
+"/market-data/live-equity-market",
+"/market-data/live-t0-market"
 ],
 "target": "NextApi/cmsHandler?functionName=getNotificationList"
 },
 "api:NextApi/dynamicApi#getCurrentTime": {
 "kind": "api",
 "pages": [
-"/",
-"/historical-data/egr",
-"/index-tracker/NIFTY%2050",
-"/index-tracker/null"
+"/market-data/block-deal-watch",
+"/market-data/exchange-traded-funds-etf",
+"/market-data/live-equity-market",
+"/market-data/live-t0-market"
 ],
 "target": "NextApi/dynamicApi?functionName=getCurrentTime"
 },
@@ -1323,26 +461,12 @@
 "api:NextApi/globalSearch/{}": {
 "kind": "api",
 "pages": [
-"/",
-"/historical-data/egr",
-"/index-tracker/NIFTY%2050",
-"/index-tracker/null"
+"/market-data/block-deal-watch",
+"/market-data/exchange-traded-funds-etf",
+"/market-data/live-equity-market",
+"/market-data/live-t0-market"
 ],
 "target": "NextApi/globalSearch/{}?symbol=${encodeURIComponent(e?.toLowerCase()||"
-},
-"archive:/content/RSS/Shareholding_sdd.xml": {
-"kind": "archive",
-"pages": [
-"/companies-listing/corporate-filings-shareholding-pattern-sdd"
-],
-"target": "/content/RSS/Shareholding_sdd.xml"
-},
-"archive:/content/assist/arbitration/asst_arb_forms.zip": {
-"kind": "archive",
-"pages": [
-"/resources/forms-formats-members"
-],
-"target": "/content/assist/arbitration/asst_arb_forms.zip"
 },
 "archive:/content/debt/New_debt_listing.xlsx": {
 "kind": "archive",
@@ -1358,26 +482,12 @@
 ],
 "target": "/content/debt/Redmn_Def_Web.csv"
 },
-"archive:/content/equities/Annualreport_FormB.zip": {
-"kind": "archive",
-"pages": [
-"/regulations/listing-compliance"
-],
-"target": "/content/equities/Annualreport_FormB.zip"
-},
 "archive:/content/equities/Axis_{date}.zip": {
 "kind": "archive",
 "pages": [
 "/market-data/securities-available-for-trading"
 ],
 "target": "/content/equities/Axis_13052022.zip"
-},
-"archive:/content/equities/Conversion_Post_Allotment_Checklist.xlsx": {
-"kind": "archive",
-"pages": [
-"/companies-listing/raising-capital-further-issues-main-sme-checklist"
-],
-"target": "/content/equities/Conversion_Post_Allotment_Checklist.xlsx"
 },
 "archive:/content/equities/DEBT.csv": {
 "kind": "archive",
@@ -1392,13 +502,6 @@
 "/market-data/securities-available-for-trading"
 ],
 "target": "/content/equities/EQUITY_L.csv"
-},
-"archive:/content/equities/FIB_10.xls": {
-"kind": "archive",
-"pages": [
-"/companies-listing/raising-capital-further-issues-main-sme-checklist"
-],
-"target": "/content/equities/FIB_10.xls"
 },
 "archive:/content/equities/IDR_W9.csv": {
 "kind": "archive",
@@ -1466,7 +569,10 @@
 "archive:/content/equities/eq_list_regulations.zip": {
 "kind": "archive",
 "pages": [
-"/companies-listing/raising-capital-debt-private-placement"
+"/market-data/block-deal-watch",
+"/market-data/exchange-traded-funds-etf",
+"/market-data/live-equity-market",
+"/market-data/live-t0-market"
 ],
 "target": "/content/equities/eq_list_regulations.zip"
 },
@@ -1490,13 +596,6 @@
 "/market-data/securities-available-for-trading"
 ],
 "target": "/content/equities/symbolchange.csv"
-},
-"archive:/content/equities/top100_common_filing.xls": {
-"kind": "archive",
-"pages": [
-"/regulations/listing-compliance"
-],
-"target": "/content/equities/top100_common_filing.xls"
 },
 "archive:/content/fo/NSE_FO_SosScheme.csv": {
 "kind": "archive",
@@ -1525,30 +624,6 @@
 "/products-services/equity-derivatives-risk-management-sec-ban"
 ],
 "target": "/content/nsccl/combineoi.zip"
-},
-"archive:/content/press/prs_ra_archives.xls": {
-"kind": "archive",
-"pages": [
-"/invest/investors-regulatory-actions",
-"/regulations/exchange-market-surveillance-regulatory-actions"
-],
-"target": "/content/press/prs_ra_archives.xls"
-},
-"archive:/content/press/prs_ra_others.xls": {
-"kind": "archive",
-"pages": [
-"/regulations/member-sebi-debarred-entities"
-],
-"target": "/content/press/prs_ra_others.xls"
-},
-"archive:/content/press/prs_ra_sebi.xls": {
-"kind": "archive",
-"pages": [
-"/invest/investors-regulatory-actions",
-"/regulations/exchange-market-surveillance-regulatory-actions",
-"/regulations/member-sebi-debarred-entities"
-],
-"target": "/content/press/prs_ra_sebi.xls"
 },
 "archive:/content/slbs/AUB_SLB.csv": {
 "kind": "archive",
