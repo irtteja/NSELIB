@@ -203,48 +203,6 @@
 }
 },
 "sources": {
-"api:NextApi/apiClient/cmPreOpenApi#getPreOpenCategory": {
-"kind": "api",
-"pages": [
-"/market-data/pre-open-market-cm-and-emerge-market"
-],
-"target": "NextApi/apiClient/cmPreOpenApi?functionName=getPreOpenCategory"
-},
-"api:NextApi/apiClient/cmPreOpenApi#getPreOpenData": {
-"kind": "api",
-"pages": [
-"/market-data/pre-open-market-cm-and-emerge-market"
-],
-"target": "NextApi/apiClient/cmPreOpenApi?functionName=getPreOpenData&category={category}&symbol={symbol}"
-},
-"api:NextApi/apiClient/cmPreOpenApi#getPreOpenDeafultGraph": {
-"kind": "api",
-"pages": [
-"/market-data/pre-open-market-cm-and-emerge-market"
-],
-"target": "NextApi/apiClient/cmPreOpenApi?functionName=getPreOpenDeafultGraph&indentifier={indentifier}"
-},
-"api:NextApi/apiClient/cmPreOpenApi#getPreOpenGraph": {
-"kind": "api",
-"pages": [
-"/market-data/pre-open-market-cm-and-emerge-market"
-],
-"target": "NextApi/apiClient/cmPreOpenApi?functionName=getPreOpenGraph&indentifier={indentifier}"
-},
-"api:NextApi/apiClient/cmPreOpenApi#getPreOpenGraphFNO": {
-"kind": "api",
-"pages": [
-"/market-data/pre-open-market-cm-and-emerge-market"
-],
-"target": "NextApi/apiClient/cmPreOpenApi?functionName=getPreOpenGraphFNO&indentifier={indentifier}"
-},
-"api:NextApi/apiStatic#getNotesData": {
-"kind": "api",
-"pages": [
-"/market-data/pre-open-market-cm-and-emerge-market"
-],
-"target": "NextApi/apiStatic?functionName=getNotesData&url=/market-data/pre-open-market-cm-and-emerge-market"
-},
 "archive:/content/debt/New_debt_listing.xlsx": {
 "kind": "archive",
 "pages": [
@@ -342,16 +300,6 @@
 "/market-data/securities-available-for-trading"
 ],
 "target": "/content/equities/eq_ilseclist.csv"
-},
-"archive:/content/equities/eq_list_regulations.zip": {
-"kind": "archive",
-"pages": [
-"/market-data/block-deal-watch",
-"/market-data/exchange-traded-funds-etf",
-"/market-data/live-equity-market",
-"/market-data/live-t0-market"
-],
-"target": "/content/equities/eq_list_regulations.zip"
 },
 "archive:/content/equities/mf_close-end.csv": {
 "kind": "archive",
