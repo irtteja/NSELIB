@@ -230,9 +230,9 @@ class CorporateMixin:
         to_date   = to_date   or date.today()
         from_date = from_date or (to_date - timedelta(days=7))
         params: dict = {
-            "index": index,
-            "from":  _fmt(from_date),
-            "to":    _fmt(to_date),
+            "index":     index,
+            "from_date": _fmt(from_date),   # NSE wants from_date/to_date; "from"/"to" return only the latest 20
+            "to_date":   _fmt(to_date),
         }
         if symbol:
             params["symbol"] = symbol.upper()
@@ -321,9 +321,9 @@ class CorporateMixin:
         to_date   = to_date   or date.today()
         from_date = from_date or (to_date - timedelta(days=30))
         params: dict = {
-            "index": "equities",
-            "from":  _fmt(from_date),
-            "to":    _fmt(to_date),
+            "index":     "equities",
+            "from_date": _fmt(from_date),   # "from"/"to" are ignored by NSE (latest 20 rows only)
+            "to_date":   _fmt(to_date),
         }
         if symbol:
             params["symbol"] = symbol.upper()
@@ -861,3 +861,56 @@ class CorporateMixin:
         path = "snapshot-capital-market-largedeal"
         params = {}
         return (self._guardian.guarded_get if self._guardian else self._session.get)(path, params)
+
+    # ---- added 2026-11-17 (PC build step 5): sources that moved or were missing ----------------------------
+    # All four use www.nseindia.com / .in live API: cloud-blocked, work from a home connection.
+
+    def integrated_filing_results(self, symbol: str, index: str = "equities") -> list[dict]:
+        """Integrated filings (financials and governance) for ``symbol`` since quarter ending Mar-2025, with
+        broadcast time and iXBRL link. Replaces corporates-financial-results, which stopped updating in 2025."""
+        params = {"index": index, "symbol": symbol.upper()}
+        resp = (self._guardian.guarded_get if self._guardian else self._session.get)(
+            "integrated-filing-results", params)
+        return resp if isinstance(resp, list) else resp.get("data", resp)
+
+    def insider_trading_filings(self, from_date: date | None = None, to_date: date | None = None,
+                                symbol: str | None = None, index: str = "equities") -> list[dict]:
+        """SEBI PIT insider-trading filings (``corporates-pit-gg``; the old ``corporates-pit`` now returns
+        nothing). Rows are a filing index with broadcast time and XBRL / iXBRL links."""
+        to_date = to_date or date.today()
+        from_date = from_date or (to_date - timedelta(days=7))
+        params = {"index": index, "from_date": _fmt(from_date), "to_date": _fmt(to_date)}
+        if symbol:
+            params["symbol"] = symbol.upper()
+        resp = (self._guardian.guarded_get if self._guardian else self._session.get)("corporates-pit-gg", params)
+        return resp if isinstance(resp, list) else resp.get("data", resp)
+
+    def bulk_block_deals(self, kind: str = "bulk_deals", from_date: date | None = None,
+                         to_date: date | None = None) -> list[dict]:
+        """Historical bulk / block / short-selling deals, all rows. ``kind``: 'bulk_deals' | 'block_deals' |
+        'short_selling'. Uses NSE's CSV answer because the JSON one is capped at 70 rows. Returns
+        ``{date, symbol, name, client, side, quantity (int), price (float), remarks}``."""
+        import csv
+        import io
+        to_date = to_date or date.today()
+        from_date = from_date or to_date
+        text = self._session.get_text("historicalOR/bulk-block-short-deals", {
+            "optionType": kind, "from": _fmt(from_date), "to": _fmt(to_date), "csv": "true"})
+        out = []
+        for r in csv.DictReader(io.StringIO(text)):
+            r = {(k or "").strip(): (v or "").strip() for k, v in r.items()}
+            num = lambda x: x.replace(",", "") if x and x != "-" else None  # noqa: E731
+            q, p = num(r.get("Quantity Traded")), num(r.get("Trade Price / Wght. Avg. Price"))
+            out.append({"date": r.get("Date"), "symbol": r.get("Symbol"), "name": r.get("Security Name"),
+                        "client": r.get("Client Name"), "side": r.get("Buy / Sell") or r.get("Buy/Sell"),
+                        "quantity": int(float(q)) if q else None, "price": float(p) if p else None,
+                        "remarks": None if r.get("Remarks") in ("", "-") else r.get("Remarks")})
+        return out
+
+    def shareholding_history(self, symbol: str, index: str = "equities") -> list[dict]:
+        """Every quarterly shareholding filing for ``symbol`` (about 5 years): quarter, broadcast time,
+        promoter % (``pr_and_prgrp``), public % (``public_val``) and XBRL link."""
+        params = {"index": index, "symbol": symbol.upper()}
+        resp = (self._guardian.guarded_get if self._guardian else self._session.get)(
+            "corporate-share-holdings-master", params)
+        return resp if isinstance(resp, list) else resp.get("data", resp)

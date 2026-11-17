@@ -358,6 +358,21 @@ class NSESession:
         resp.raise_for_status()
         return resp.json()
 
+    def get_text(self, path: str, params: dict | None = None) -> str:
+        """Rate-limited GET of a non-JSON /api/ answer (e.g. ``&csv=true`` downloads). Tries .com, then .in."""
+        for base, headers, ensure in ((NSE_API, None, self._ensure_session),
+                                      (NSE_API_IN, _HEADERS_IN, self._ensure_session_in)):
+            try:
+                ensure()
+                self._bucket.consume()
+                r = self._s.get(f"{base}/{path.lstrip('/')}", params=params, timeout=self._timeout,
+                                headers=headers)
+                if r.status_code == 200 and b"DOCTYPE" not in r.content[:50]:
+                    return r.content.decode("utf-8-sig", "replace")
+            except Exception:
+                continue
+        raise NSEFileUnavailableError(f"{path} {params}")
+
     def _get_in(self, path: str, params: dict | None) -> Any:
         """Try nseindia.in; returns parsed non-empty JSON or None."""
         self._ensure_session_in()

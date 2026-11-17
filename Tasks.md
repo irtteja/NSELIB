@@ -177,3 +177,8 @@ Format: `- [ ]` pending · `- [x]` done · `- [~]` blocked/deferred
 - [x] `options_oi_history(symbol, expiry, from_date, to_date)` — EOD OI per strike over time
 - [x] Test suite — pytest covering all archive-based methods with known past dates
 - [ ] CI — run tests on push, alert if >10% methods break
+
+## PC build step 5 (2026-11-17)
+- [x] Fix `announcements()` / `board_meetings()` date params (`from_date`/`to_date`)
+- [x] `integrated_filing_results()`, `insider_trading_filings()`, `bulk_block_deals()` (CSV), `shareholding_history()`
+- [x] `NSESession.get_text()` for CSV answers
