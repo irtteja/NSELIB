@@ -875,14 +875,28 @@ class CorporateMixin:
 
     def insider_trading_filings(self, from_date: date | None = None, to_date: date | None = None,
                                 symbol: str | None = None, index: str = "equities") -> list[dict]:
-        """SEBI PIT insider-trading filings (``corporates-pit-gg``; the old ``corporates-pit`` now returns
-        nothing). Rows are a filing index with broadcast time and XBRL / iXBRL links."""
+        """SEBI PIT insider-trading filings from NSE's new system (``corporates-pit-gg``, from 3 May 2026).
+        Rows are a filing index with broadcast time and XBRL / iXBRL links. For older filings (one row per
+        trade, up to 2 May 2026) use :meth:`insider_trades`."""
         to_date = to_date or date.today()
         from_date = from_date or (to_date - timedelta(days=7))
         params = {"index": index, "from_date": _fmt(from_date), "to_date": _fmt(to_date)}
         if symbol:
             params["symbol"] = symbol.upper()
         resp = (self._guardian.guarded_get if self._guardian else self._session.get)("corporates-pit-gg", params)
+        return resp if isinstance(resp, list) else resp.get("data", resp)
+
+    def insider_trades(self, from_date: date | None = None, to_date: date | None = None,
+                       symbol: str | None = None, index: str = "equities") -> list[dict]:
+        """SEBI PIT insider trades from NSE's old system (``corporates-pit``), up to 2 May 2026: one row per
+        trade with person, category, mode, buy/sell quantity and value, holding before/after. Needs
+        ``from_date``/``to_date``; without them NSE answers with nothing. No row cap (week sums = month)."""
+        to_date = to_date or date.today()
+        from_date = from_date or (to_date - timedelta(days=7))
+        params = {"index": index, "from_date": _fmt(from_date), "to_date": _fmt(to_date)}
+        if symbol:
+            params["symbol"] = symbol.upper()
+        resp = (self._guardian.guarded_get if self._guardian else self._session.get)("corporates-pit", params)
         return resp if isinstance(resp, list) else resp.get("data", resp)
 
     def bulk_block_deals(self, kind: str = "bulk_deals", from_date: date | None = None,

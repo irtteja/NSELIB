@@ -9,8 +9,9 @@ Newest entries at top.
 - **Fix:** `announcements()` and `board_meetings()` sent `from`/`to`; NSE ignores those and returns only the latest
   20 rows. Now `from_date`/`to_date` (2–3 Nov 2026: 20 -> 2,046 announcements, 668 board meetings).
 - **New:** `integrated_filing_results(symbol)` (results since Mar-2025 quarter; old `corporates-financial-results`
-  stopped updating in 2025), `insider_trading_filings()` (`corporates-pit-gg`; old `corporates-pit` returns
-  nothing), `bulk_block_deals(kind, from, to)` (CSV answer: the JSON one is capped at 70 rows; 13-Nov-2026 bulk =
+  stopped updating in 2025), `insider_trading_filings()` (`corporates-pit-gg`, from 3 May 2026),
+  `insider_trades()` (old `corporates-pit`, up to 2 May 2026, one row per trade; it only answers when sent
+  `from_date`/`to_date` — the earlier "returns nothing" was the same date-parameter bug), `bulk_block_deals(kind, from, to)` (CSV answer: the JSON one is capped at 70 rows; 13-Nov-2026 bulk =
   136 rows, Oct-2026 = 2,771), `shareholding_history(symbol)` (`corporate-share-holdings-master`, ~5 years).
 - **New:** `NSESession.get_text()` for non-JSON `/api/` answers (`&csv=true`), .com then .in.
 - All called live from a home connection and returned data. All are cloud-blocked (live API).

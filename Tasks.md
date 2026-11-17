@@ -182,3 +182,4 @@ Format: `- [ ]` pending · `- [x]` done · `- [~]` blocked/deferred
 - [x] Fix `announcements()` / `board_meetings()` date params (`from_date`/`to_date`)
 - [x] `integrated_filing_results()`, `insider_trading_filings()`, `bulk_block_deals()` (CSV), `shareholding_history()`
 - [x] `NSESession.get_text()` for CSV answers
+- [x] `insider_trades()` — old PIT list (`corporates-pit`, to 2 May 2026), one row per trade
